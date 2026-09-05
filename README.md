@@ -1,7 +1,6 @@
 # ShopSphere – Modern E-Commerce Platform
 
-ShopSphere is a full-featured, production-ready full-stack online shopping platform engineered with a React/Vite/Tailwind frontend and a robust Node.js/Express/TypeScript REST API backend powered by PostgreSQL, Prisma ORM, Redis caching, Razorpay payment processing, and Swagger API documentation.
-
+ShopSphere is a modern, full-stack e-commerce platform designed to deliver a seamless online shopping experience. It features a responsive React, Vite, and Tailwind CSS frontend, backed by a scalable Node.js, Express, and TypeScript REST API.
 ---
 
 ## Key Features
