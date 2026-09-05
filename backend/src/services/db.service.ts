@@ -1,0 +1,889 @@
+import bcrypt from 'bcryptjs';
+import { prisma } from '../config/prisma.js';
+import { logger } from '../utils/logger.js';
+
+export interface MemoryStore {
+  users: any[];
+  refreshTokens: any[];
+  addresses: any[];
+  categories: any[];
+  brands: any[];
+  products: any[];
+  productImages: any[];
+  carts: any[];
+  cartItems: any[];
+  wishlists: any[];
+  wishlistItems: any[];
+  orders: any[];
+  orderItems: any[];
+  payments: any[];
+  reviews: any[];
+  coupons: any[];
+  notifications: any[];
+}
+
+export const initialSeedData: MemoryStore = {
+  users: [],
+  refreshTokens: [],
+  addresses: [],
+  categories: [],
+  brands: [],
+  products: [],
+  productImages: [],
+  carts: [],
+  cartItems: [],
+  wishlists: [],
+  wishlistItems: [],
+  orders: [],
+  orderItems: [],
+  payments: [],
+  reviews: [],
+  coupons: [],
+  notifications: [],
+};
+
+let isPostgresAvailable = false;
+let memoryStore: MemoryStore = { ...initialSeedData };
+
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    isPostgresAvailable = true;
+    logger.info('Connected to PostgreSQL database via Prisma');
+    return true;
+  } catch (err: any) {
+    isPostgresAvailable = false;
+    logger.warn('PostgreSQL connection unavailable. Operating in resilient Memory Store mode with full seed data.');
+    return false;
+  }
+}
+
+export const getDbStatus = () => ({
+  isPostgresAvailable,
+  mode: isPostgresAvailable ? 'PostgreSQL (Prisma)' : 'Resilient In-Memory Database',
+});
+
+export const getMemoryStore = () => memoryStore;
+export const setMemoryStore = (store: MemoryStore) => {
+  memoryStore = store;
+};
+
+// Initialize seed data helper
+export async function initializeSeedData() {
+  const hashedPassword = await bcrypt.hash('Admin@123456', 10);
+  const customerPassword = await bcrypt.hash('Customer@123456', 10);
+
+  const adminUser = {
+    id: '11111111-1111-1111-1111-111111111111',
+    email: 'admin@shopsphere.com',
+    name: 'ShopSphere Admin',
+    password: hashedPassword,
+    phone: '+91 9876543210',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    role: 'ADMIN',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const customerUser = {
+    id: '22222222-2222-2222-2222-222222222222',
+    email: 'customer@shopsphere.com',
+    name: 'Alex Johnson',
+    password: customerPassword,
+    phone: '+91 9876543211',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+    role: 'CUSTOMER',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const defaultAddress = {
+    id: '33333333-3333-3333-3333-333333333333',
+    userId: customerUser.id,
+    fullName: 'Alex Johnson',
+    phone: '+91 9876543211',
+    street: '42 Tech Park Avenue, Cyber City',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    postalCode: '560100',
+    country: 'India',
+    isDefault: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const categories = [
+    {
+      id: 'c1000000-0000-0000-0000-000000000001',
+      name: 'Smartphones',
+      slug: 'smartphones',
+      description: 'Latest 5G flagship and performance smartphones',
+      icon: 'Smartphone',
+      image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02560?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000002',
+      name: 'Laptops & Computers',
+      slug: 'laptops-computers',
+      description: 'Powerhouse laptops, MacBooks, and ultrabooks',
+      icon: 'Laptop',
+      image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000003',
+      name: 'Audio & Headphones',
+      slug: 'audio-headphones',
+      description: 'Noise cancelling headphones, wireless earbuds & soundbars',
+      icon: 'Headphones',
+      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000004',
+      name: 'Wearables & Watches',
+      slug: 'wearables-watches',
+      description: 'Smart watches, fitness trackers, and luxury chronographs',
+      icon: 'Watch',
+      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000005',
+      name: 'Gaming & VR',
+      slug: 'gaming-vr',
+      description: 'Consoles, controllers, headsets, and PC gaming gear',
+      icon: 'Gamepad2',
+      image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000006',
+      name: 'Cameras & Gear',
+      slug: 'cameras-gear',
+      description: 'DSLRs, mirrorless cameras, lenses and stabilizers',
+      icon: 'Camera',
+      image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000007',
+      name: "Men's Fashion",
+      slug: 'mens-fashion',
+      description: 'Premium jackets, casual wear, shoes, and accessories',
+      icon: 'Shirt',
+      image: 'https://images.unsplash.com/photo-1490578474895-699cd4e2cf59?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000008',
+      name: "Women's Fashion",
+      slug: 'womens-fashion',
+      description: 'Elegant designer dresses, tops, footwear, and handbags',
+      icon: 'ShoppingBag',
+      image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000009',
+      name: 'Home & Kitchen',
+      slug: 'home-kitchen',
+      description: 'Smart appliances, espresso machines, and decor',
+      icon: 'Home',
+      image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'c1000000-0000-0000-0000-000000000010',
+      name: 'Sports & Fitness',
+      slug: 'sports-fitness',
+      description: 'Gym equipment, running shoes, and athleisure',
+      icon: 'Dumbbell',
+      image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80',
+    },
+  ];
+
+  const brands = [
+    {
+      id: 'b1000000-0000-0000-0000-000000000001',
+      name: 'Apple',
+      slug: 'apple',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
+      description: 'Think Different - Innovation in technology and design',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000002',
+      name: 'Samsung',
+      slug: 'samsung',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg',
+      description: 'Inspire the World, Create the Future',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000003',
+      name: 'Sony',
+      slug: 'sony',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg',
+      description: 'Pioneering entertainment, sound, and visual imaging',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000004',
+      name: 'Dell',
+      slug: 'dell',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/4/48/Dell_Logo.svg',
+      description: 'High performance computing and business workstations',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000005',
+      name: 'Nike',
+      slug: 'nike',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg',
+      description: 'Just Do It - Global leader in athletic performance',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000006',
+      name: 'Adidas',
+      slug: 'adidas',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg',
+      description: 'Through sport, we have the power to change lives',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000007',
+      name: 'Bose',
+      slug: 'bose',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Bose_logo.svg',
+      description: 'Better Sound Through Research',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000008',
+      name: 'Canon',
+      slug: 'canon',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/8/8d/Canon-Logo.svg',
+      description: 'Delighting You Always - Precision optics and imaging',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000009',
+      name: 'Puma',
+      slug: 'puma',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/8/88/Puma_logo.svg',
+      description: 'Forever Faster sportswear and urban fashion',
+    },
+    {
+      id: 'b1000000-0000-0000-0000-000000000010',
+      name: 'Philips',
+      slug: 'philips',
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/2/25/Philips_logo.svg',
+      description: 'Innovation and you - Modern lifestyle & smart grooming',
+    },
+  ];
+
+  const products = [
+    {
+      id: 'p1000000-0000-0000-0000-000000000001',
+      name: 'iPhone 16 Pro Max 256GB Titanium',
+      slug: 'iphone-16-pro-max-256gb-titanium',
+      description: 'Apple iPhone 16 Pro Max featuring aerospace-grade Titanium design, A18 Pro Bionic chip, 48MP Fusion camera system with 5x telephoto zoom, and all-day battery life.',
+      price: 144900,
+      discountPrice: 134900,
+      sku: 'IPH-16PM-256-NAT',
+      stock: 45,
+      rating: 4.9,
+      numReviews: 128,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[0].id,
+      brandId: brands[0].id,
+      specifications: {
+        Display: '6.9-inch Super Retina XDR OLED 120Hz ProMotion',
+        Processor: 'Apple A18 Pro Hexa-Core 3nm',
+        Storage: '256 GB NVMe',
+        Camera: '48MP Main + 48MP Ultra-wide + 12MP 5x Telephoto',
+        Battery: 'Up to 33 hours video playback',
+        OS: 'iOS 18',
+        Warranty: '1 Year Apple Official Warranty',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000002',
+      name: 'Samsung Galaxy S24 Ultra 5G AI Smartphone',
+      slug: 'samsung-galaxy-s24-ultra-5g',
+      description: 'Galaxy S24 Ultra with Galaxy AI, built-in S Pen, Titanium frame, 200MP camera with Quad Telephoto, and Snapdragon 8 Gen 3 processor.',
+      price: 129999,
+      discountPrice: 119999,
+      sku: 'SAM-S24U-256-GRY',
+      stock: 38,
+      rating: 4.8,
+      numReviews: 94,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: true,
+      categoryId: categories[0].id,
+      brandId: brands[1].id,
+      specifications: {
+        Display: '6.8-inch Dynamic AMOLED 2X 120Hz 2600 nits',
+        Processor: 'Qualcomm Snapdragon 8 Gen 3 for Galaxy',
+        Storage: '256 GB UFS 4.0 / 12 GB RAM',
+        Camera: '200MP + 50MP + 12MP + 10MP Quad Camera',
+        Battery: '5000 mAh 45W Fast Charging',
+        OS: 'Android 14, One UI 6.1 with 7 Years Updates',
+        Warranty: '1 Year Brand Warranty',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1580910051074-3eb694886505?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000003',
+      name: 'MacBook Pro 16-inch M3 Max (36GB RAM, 1TB SSD)',
+      slug: 'macbook-pro-16-inch-m3-max',
+      description: 'Liquid Retina XDR display, up to 22 hours battery life, hardware-accelerated ray tracing, studio-quality microphones, and versatile ports.',
+      price: 349900,
+      discountPrice: 329900,
+      sku: 'APP-MBP16-M3MAX',
+      stock: 14,
+      rating: 4.9,
+      numReviews: 42,
+      isFeatured: true,
+      isTrending: false,
+      isFlashSale: false,
+      categoryId: categories[1].id,
+      brandId: brands[0].id,
+      specifications: {
+        Display: '16.2-inch Liquid Retina XDR 120Hz Extreme Dynamic Range',
+        Processor: 'Apple M3 Max 14-core CPU, 30-core GPU',
+        Memory: '36GB Unified Memory',
+        Storage: '1TB Superfast SSD',
+        Battery: '100Wh, up to 22 hours',
+        Ports: 'HDMI, MagSafe 3, SDXC card slot, 3x Thunderbolt 4',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000004',
+      name: 'Dell XPS 15 9530 OLED Touch Creator Laptop',
+      slug: 'dell-xps-15-9530-oled-touch',
+      description: 'Stunning 3.5K OLED touchscreen display, 13th Gen Intel Core i9, NVIDIA GeForce RTX 4070, CNC aluminum and carbon fiber chassis.',
+      price: 249990,
+      discountPrice: 224990,
+      sku: 'DEL-XPS15-9530',
+      stock: 9,
+      rating: 4.7,
+      numReviews: 36,
+      isFeatured: false,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[1].id,
+      brandId: brands[3].id,
+      specifications: {
+        Display: '15.6-inch 3.5K (3456 x 2160) OLED Touch',
+        Processor: 'Intel Core i9-13900H 14 Cores',
+        Graphics: 'NVIDIA RTX 4070 8GB GDDR6',
+        Memory: '32GB DDR5 4800MHz',
+        Storage: '1TB PCIe Gen 4 SSD',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000005',
+      name: 'Sony WH-1000XM5 Wireless Noise Cancelling Headphones',
+      slug: 'sony-wh-1000xm5-wireless-headphones',
+      description: 'Industry-leading noise cancellation with 8 microphones, Auto NC Optimizer, crystal clear hands-free calling, and up to 30 hours battery life.',
+      price: 34990,
+      discountPrice: 26990,
+      sku: 'SNY-WH1000XM5-BLK',
+      stock: 65,
+      rating: 4.8,
+      numReviews: 215,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: true,
+      categoryId: categories[2].id,
+      brandId: brands[2].id,
+      specifications: {
+        Type: 'Over-Ear Wireless ANC',
+        Driver: '30mm Carbon Fiber Driver Unit',
+        Battery: '30 Hours with ANC, 3 min quick charge for 3 hours playback',
+        Codec: 'LDAC, AAC, SBC, Hi-Res Audio Wireless',
+        Weight: '250 grams',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000006',
+      name: 'Bose QuietComfort Ultra Spatial Audio Earbuds',
+      slug: 'bose-quietcomfort-ultra-earbuds',
+      description: 'Breakthrough spatial audio for immersive listening, world-class noise cancellation tuned to your ears with CustomTune technology.',
+      price: 29900,
+      discountPrice: 24900,
+      sku: 'BOS-QCU-EAR-WHT',
+      stock: 32,
+      rating: 4.7,
+      numReviews: 89,
+      isFeatured: false,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[2].id,
+      brandId: brands[6].id,
+      specifications: {
+        Connectivity: 'Bluetooth 5.3 with multipoint',
+        Audio: 'Bose Immersive Audio Spatial Sound',
+        Battery: '6 hours earbud + 18 hours case',
+        WaterResistance: 'IPX4 Sweat & Weather Resistant',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000007',
+      name: 'Apple Watch Ultra 2 GPS + Cellular 49mm Titanium',
+      slug: 'apple-watch-ultra-2-gps-cellular',
+      description: 'The most rugged and capable Apple Watch. 3000-nit Retina display, precision dual-frequency GPS, customizable Action button, 36hr battery.',
+      price: 89900,
+      discountPrice: 84900,
+      sku: 'APP-WCH-ULT2-49',
+      stock: 22,
+      rating: 4.9,
+      numReviews: 67,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[3].id,
+      brandId: brands[0].id,
+      specifications: {
+        Case: '49mm Aerospace Titanium Case with Sapphire Crystal',
+        Display: 'Always-On Retina 3000 nits',
+        Battery: '36 hours normal use, up to 72 hours in Low Power Mode',
+        WaterResistance: '100m water resistant, EN13319 certified dive computer',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000008',
+      name: 'Sony PlayStation 5 Pro Console (2TB SSD Edition)',
+      slug: 'sony-playstation-5-pro-console-2tb',
+      description: 'PlayStation Spectral Super Resolution AI upscaling, enhanced GPU with 67% more compute units, advanced Ray Tracing, and 2TB high speed SSD.',
+      price: 69990,
+      discountPrice: 66990,
+      sku: 'SNY-PS5-PRO-2TB',
+      stock: 18,
+      rating: 4.9,
+      numReviews: 154,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: true,
+      categoryId: categories[4].id,
+      brandId: brands[2].id,
+      specifications: {
+        Storage: '2TB Custom Ultra-High Speed NVMe SSD',
+        Resolution: '4K 120Hz and 8K support',
+        Audio: 'Tempest 3D AudioTech',
+        Controller: 'DualSense Wireless Controller with Haptic Feedback',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000009',
+      name: 'Canon EOS R6 Mark II Mirrorless Camera Body',
+      slug: 'canon-eos-r6-mark-ii-mirrorless',
+      description: '24.2 MP full-frame CMOS sensor, 40 fps electronic shutter, 6K oversampled 4K 60p video, in-body image stabilization up to 8 stops.',
+      price: 215995,
+      discountPrice: 199995,
+      sku: 'CAN-EOSR6-MK2',
+      stock: 11,
+      rating: 4.8,
+      numReviews: 48,
+      isFeatured: false,
+      isTrending: false,
+      isFlashSale: false,
+      categoryId: categories[5].id,
+      brandId: brands[7].id,
+      specifications: {
+        Sensor: '24.2MP Full-Frame CMOS Sensor',
+        ContinuousShooting: 'Up to 40 fps with Electronic Shutter',
+        Video: '4K 60p 10-bit 4:2:2 Internal Video',
+        Autofocus: 'Dual Pixel CMOS AF II with Deep Learning AI',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000010',
+      name: 'Nike Air Jordan 1 Retro High OG Chicago',
+      slug: 'nike-air-jordan-1-retro-high-og-chicago',
+      description: 'Iconic basketball silhouette with premium genuine leather upper, encapsulated Air-Sole cushioning in heel, and classic Chicago color blocking.',
+      price: 16995,
+      discountPrice: 14995,
+      sku: 'NKE-AJ1-HIGH-CHI',
+      stock: 25,
+      rating: 4.9,
+      numReviews: 310,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: true,
+      categoryId: categories[6].id,
+      brandId: brands[4].id,
+      specifications: {
+        Material: '100% Genuine Full-Grain Leather',
+        Sole: 'Solid Rubber Outsole with Deep Flex Grooves',
+        Cushioning: 'Encapsulated Nike Air Unit',
+        Fit: 'Standard Lace-up High Top',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000011',
+      name: 'Adidas Originals Ultraboost Light Running Shoes',
+      slug: 'adidas-originals-ultraboost-light',
+      description: 'Lightest Ultraboost ever made with 30% lighter Light BOOST material. Epic energy return and Primeknit+ FORGED textile upper.',
+      price: 18999,
+      discountPrice: 13999,
+      sku: 'ADI-UB-LIGHT-WHT',
+      stock: 40,
+      rating: 4.7,
+      numReviews: 180,
+      isFeatured: false,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[9].id,
+      brandId: brands[5].id,
+      specifications: {
+        Midsole: 'Light BOOST Cushioning',
+        Outsole: 'Continental Better Rubber outsole',
+        Upper: 'Adidas PRIMEKNIT+ textile upper',
+        Drop: '10 mm midsole drop',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000012',
+      name: 'Puma Men Lightweight Water-Repellent Puffer Jacket',
+      slug: 'puma-men-water-repellent-puffer-jacket',
+      description: 'Stay warm and stylish with warmCELL and windCELL thermal insulation tech. Made with 100% recycled polyester fill.',
+      price: 8999,
+      discountPrice: 4999,
+      sku: 'PUM-JKT-PUFF-NVY',
+      stock: 50,
+      rating: 4.6,
+      numReviews: 64,
+      isFeatured: false,
+      isTrending: false,
+      isFlashSale: true,
+      categoryId: categories[6].id,
+      brandId: brands[8].id,
+      specifications: {
+        Material: '100% Recycled Polyester',
+        Technology: 'warmCELL thermal insulation',
+        Closure: 'Full zip with storm flap and stand-up collar',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000013',
+      name: 'Philips Series 9000 Prestige Wet & Dry Electric Shaver',
+      slug: 'philips-series-9000-prestige-electric-shaver',
+      description: 'NanoTech DualPrecision self-sharpening blades, SkinIQ sensor technology, Qi wireless charging pad, and digital display.',
+      price: 29995,
+      discountPrice: 22995,
+      sku: 'PHI-SHV-S9000P',
+      stock: 19,
+      rating: 4.8,
+      numReviews: 53,
+      isFeatured: false,
+      isTrending: false,
+      isFlashSale: false,
+      categoryId: categories[8].id,
+      brandId: brands[9].id,
+      specifications: {
+        Blades: 'NanoTech DualPrecision Blades',
+        Motor: 'Top-spin digital motor',
+        Charging: 'Qi Wireless Charging Pad included',
+        Runtime: '60 minutes precision shaving',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1621607512214-68297480165e?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000014',
+      name: 'Philips Hue Smart Ambient Gradient Lightstrip 2M',
+      slug: 'philips-hue-gradient-lightstrip-2m',
+      description: 'Seamlessly blend multiple colors of light simultaneously in a single LED strip. Syncs with movies, music, and gaming.',
+      price: 14999,
+      discountPrice: 11499,
+      sku: 'PHI-HUE-GRAD-2M',
+      stock: 3, // Low stock for testing alert!
+      rating: 4.7,
+      numReviews: 92,
+      isFeatured: false,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[8].id,
+      brandId: brands[9].id,
+      specifications: {
+        Length: '2 Meters, extendable up to 10M',
+        Colors: '16 Million Colors + Tunable Warm to Cool White',
+        Integration: 'Apple HomeKit, Alexa, Google Assistant',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000015',
+      name: 'Nike Sportswear Tech Fleece Full-Zip Windrunner Hoodie',
+      slug: 'nike-tech-fleece-windrunner-hoodie',
+      description: 'Smooth on both sides, Tech Fleece offers premium warmth and an elevated look without adding excess weight or bulk.',
+      price: 8495,
+      discountPrice: 6995,
+      sku: 'NKE-TF-WIND-GRY',
+      stock: 45,
+      rating: 4.7,
+      numReviews: 143,
+      isFeatured: true,
+      isTrending: true,
+      isFlashSale: false,
+      categoryId: categories[6].id,
+      brandId: brands[4].id,
+      specifications: {
+        Material: '53% Cotton / 47% Polyester',
+        Pockets: 'Zippered sleeve pocket and split kangaroo pocket',
+        Fit: 'Standard athletic fit',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+    {
+      id: 'p1000000-0000-0000-0000-000000000016',
+      name: 'Sony Alpha 7 IV Full-Frame Hybrid Camera with 28-70mm Lens',
+      slug: 'sony-alpha-7-iv-full-frame-hybrid',
+      description: '33MP Exmor R back-illuminated sensor, BIONZ XR processing engine, 4K 60p video, real-time Eye AF for humans, animals, and birds.',
+      price: 242990,
+      discountPrice: 224990,
+      sku: 'SNY-A7M4-LENSKIT',
+      stock: 8,
+      rating: 4.9,
+      numReviews: 76,
+      isFeatured: true,
+      isTrending: false,
+      isFlashSale: false,
+      categoryId: categories[5].id,
+      brandId: brands[2].id,
+      specifications: {
+        Sensor: '33 MP 35mm Full-Frame Exmor R CMOS Sensor',
+        ISO: 'ISO 100-51200 (Expandable to 50-204800)',
+        Stabilization: '5-axis Optical In-Body Image Stabilization',
+        Viewfinder: '3.68 million-dot Quad-VGA OLED EVF',
+      },
+      images: [
+        'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80',
+      ],
+    },
+  ];
+
+  const coupons = [
+    {
+      id: 'cp100000-0000-0000-0000-000000000001',
+      code: 'WELCOME10',
+      discountType: 'PERCENTAGE',
+      discountValue: 10,
+      minimumOrder: 500,
+      maxDiscount: 1500,
+      expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      usageLimit: 500,
+      usedCount: 23,
+      isActive: true,
+    },
+    {
+      id: 'cp100000-0000-0000-0000-000000000002',
+      code: 'FLASH50',
+      discountType: 'PERCENTAGE',
+      discountValue: 50,
+      minimumOrder: 2000,
+      maxDiscount: 2000,
+      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      usageLimit: 100,
+      usedCount: 42,
+      isActive: true,
+    },
+    {
+      id: 'cp100000-0000-0000-0000-000000000003',
+      code: 'SAVE500',
+      discountType: 'FIXED',
+      discountValue: 500,
+      minimumOrder: 2500,
+      maxDiscount: null,
+      expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      usageLimit: 200,
+      usedCount: 15,
+      isActive: true,
+    },
+    {
+      id: 'cp100000-0000-0000-0000-000000000004',
+      code: 'FREESHIP',
+      discountType: 'FIXED',
+      discountValue: 100,
+      minimumOrder: 999,
+      maxDiscount: null,
+      expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+      usageLimit: 1000,
+      usedCount: 88,
+      isActive: true,
+    },
+  ];
+
+  const reviews = [
+    {
+      id: 'r1000000-0000-0000-0000-000000000001',
+      productId: products[0].id,
+      userId: customerUser.id,
+      user: { name: customerUser.name, avatar: customerUser.avatar },
+      rating: 5,
+      title: 'Best smartphone experience ever!',
+      comment: 'The camera quality and titanium build are breathtaking. Battery life easily lasts beyond 1.5 days of heavy productivity use.',
+      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: 'r1000000-0000-0000-0000-000000000002',
+      productId: products[4].id,
+      userId: customerUser.id,
+      user: { name: customerUser.name, avatar: customerUser.avatar },
+      rating: 5,
+      title: 'Unbelievable noise cancelling',
+      comment: 'Blocks out subway noise and office chatter completely. Comfort is top notch for 8+ hour flights.',
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  const notifications = [
+    {
+      id: 'n1000000-0000-0000-0000-000000000001',
+      userId: customerUser.id,
+      title: 'Welcome to ShopSphere!',
+      message: 'Explore our curated catalog and use coupon code WELCOME10 for 10% off your first order.',
+      type: 'INFO',
+      isRead: false,
+      link: '/shop',
+      createdAt: new Date(),
+    },
+    {
+      id: 'n1000000-0000-0000-0000-000000000002',
+      userId: customerUser.id,
+      title: 'Flash Sale Live Now!',
+      message: 'Get up to 50% discount on premium electronics and athletic wear for the next 24 hours.',
+      type: 'SALE',
+      isRead: false,
+      link: '/deals',
+      createdAt: new Date(),
+    },
+  ];
+
+  // Populate memory store
+  memoryStore.users = [adminUser, customerUser];
+  memoryStore.addresses = [defaultAddress];
+  memoryStore.categories = categories;
+  memoryStore.brands = brands;
+  memoryStore.products = products;
+  memoryStore.coupons = coupons;
+  memoryStore.reviews = reviews;
+  memoryStore.notifications = notifications;
+  memoryStore.carts = [
+    {
+      id: 'cart-customer-1',
+      userId: customerUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+  memoryStore.cartItems = [
+    {
+      id: 'cartitem-1',
+      cartId: 'cart-customer-1',
+      productId: products[4].id,
+      quantity: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+  memoryStore.wishlists = [
+    {
+      id: 'wishlist-customer-1',
+      userId: customerUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+  memoryStore.wishlistItems = [
+    {
+      id: 'wishitem-1',
+      wishlistId: 'wishlist-customer-1',
+      productId: products[0].id,
+      createdAt: new Date(),
+    },
+  ];
+
+  // Seed sample order for customer so they can track immediately
+  const sampleOrder = {
+    id: 'ord-100001',
+    orderNumber: 'ORD-98241',
+    userId: customerUser.id,
+    addressId: defaultAddress.id,
+    address: defaultAddress,
+    status: 'SHIPPED',
+    totalAmount: 26990,
+    subtotal: 26990,
+    taxAmount: 0,
+    shippingAmount: 0,
+    discountAmount: 0,
+    deliveryMethod: 'EXPRESS',
+    deliveryEstimate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    couponCode: null,
+    notes: 'Please ring the doorbell',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    updatedAt: new Date(),
+    items: [
+      {
+        id: 'orditem-1',
+        orderId: 'ord-100001',
+        productId: products[4].id,
+        name: products[4].name,
+        price: 26990,
+        quantity: 1,
+        subtotal: 26990,
+      },
+    ],
+    payment: {
+      id: 'pay-100001',
+      orderId: 'ord-100001',
+      amount: 26990,
+      method: 'RAZORPAY',
+      status: 'COMPLETED',
+      razorpayOrderId: 'order_mock_98241',
+      razorpayPaymentId: 'pay_mock_98241',
+    },
+  };
+  memoryStore.orders = [sampleOrder];
+  memoryStore.orderItems = sampleOrder.items;
+  memoryStore.payments = [sampleOrder.payment];
+
+  logger.info(`Initialized seed dataset with ${categories.length} categories, ${brands.length} brands, ${products.length} products, 2 demo users, and active coupons.`);
+}
