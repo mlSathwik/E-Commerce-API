@@ -59,8 +59,8 @@ export const Shop: React.FC = () => {
           categoryApi.getCategories(),
           brandApi.getBrands(),
         ]);
-        setCategories(catsRes.data);
-        setBrands(brandsRes.data);
+        setCategories(Array.isArray(catsRes.data) ? catsRes.data : []);
+        setBrands(Array.isArray(brandsRes.data) ? brandsRes.data : []);
       } catch (err) {
         console.error('Failed to load categories/brands:', err);
       }
@@ -74,8 +74,9 @@ export const Shop: React.FC = () => {
       try {
         setLoading(true);
         const res = await productApi.getProducts(filters);
-        setProducts(res.data);
-        setTotalCount(res.meta?.total ?? res.data.length);
+        const prods = Array.isArray(res.data) ? res.data : [];
+        setProducts(prods);
+        setTotalCount(res.meta?.total ?? prods.length);
         setTotalPages(res.meta?.totalPages ?? 1);
       } catch (err) {
         console.error('Failed to fetch shop products:', err);

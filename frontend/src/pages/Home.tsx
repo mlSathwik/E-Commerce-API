@@ -58,16 +58,21 @@ export const Home: React.FC = () => {
           productApi.getProducts({ limit: 16 }),
         ]);
 
-        setCategories(catsRes.data);
-        setTrendingProducts(trendRes.data);
-        setFlashSaleProducts(flashRes.data);
+        const cats = Array.isArray(catsRes?.data) ? catsRes.data : [];
+        const trending = Array.isArray(trendRes?.data) ? trendRes.data : [];
+        const flash = Array.isArray(flashRes?.data) ? flashRes.data : [];
+        const all = Array.isArray(allRes?.data) ? allRes.data : [];
+
+        setCategories(cats);
+        setTrendingProducts(trending);
+        setFlashSaleProducts(flash);
 
         // Sort best sellers by review count
-        const sortedBest = [...allRes.data].sort((a, b) => b.numReviews - a.numReviews).slice(0, 8);
+        const sortedBest = [...all].sort((a, b) => b.numReviews - a.numReviews).slice(0, 8);
         setBestSellers(sortedBest);
 
         // New arrivals
-        const sortedNew = [...allRes.data].reverse().slice(0, 8);
+        const sortedNew = [...all].reverse().slice(0, 8);
         setNewArrivals(sortedNew);
       } catch (error) {
         console.error('Failed to load home page data:', error);
