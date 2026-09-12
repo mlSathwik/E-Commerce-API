@@ -12,13 +12,18 @@ import {
   Share2,
   AlertCircle,
   MessageSquare,
+  CreditCard,
+  MapPin,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { productApi } from '../api/productApi.js';
 import { reviewApi } from '../api/reviewApi.js';
-import { Product, Review } from '../types/index.js';
+import { Product, ProductVariant, Review } from '../types/index.js';
 import { formatPrice, calculateDiscount, formatDate } from '../utils/formatters.js';
 import { RatingStars } from '../components/common/RatingStars.js';
 import { Button } from '../components/common/Button.js';
+import { Modal } from '../components/common/Modal.js';
 import { ProductCard } from '../components/products/ProductCard.js';
 import { useCart } from '../contexts/CartContext.js';
 import { useWishlist } from '../contexts/WishlistContext.js';
@@ -29,7 +34,7 @@ export const ProductDetails: React.FC = () => {
   const navigate = useNavigate();
   const { addToCart, loading: cartLoading } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -38,12 +43,34 @@ export const ProductDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Variant selection state
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
+  const [selectedRam, setSelectedRam] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+
+  // Delivery postal code checker state
+  const [pincode, setPincode] = useState('');
+  const [pincodeResult, setPincodeResult] = useState<{
+    checked: boolean;
+    valid: boolean;
+    standardDate: string;
+    expressDate: string;
+    codAvailable: boolean;
+    message?: string;
+  } | null>(null);
+
+  // EMI calculator modal state
+  const [isEmiModalOpen, setIsEmiModalOpen] = useState(false);
+
   // Review form state
   const [newRating, setNewRating] = useState(5);
   const [newTitle, setNewTitle] = useState('');
   const [newComment, setNewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -52,8 +79,25 @@ export const ProductDetails: React.FC = () => {
         setLoading(true);
         setError('');
         const res = await productApi.getProductById(id);
-        setProduct(res.data);
+        const prod = res.data;
+        setProduct(prod);
         setSelectedImage(0);
+
+        if (prod.variants && prod.variants.length > 0) {
+          const firstVariant = prod.variants[0];
+          setSelectedVariant(firstVariant);
+          setSelectedColor(firstVariant.color || null);
+          setSelectedStorage(firstVariant.storage || null);
+          setSelectedRam(firstVariant.ram || null);
+          setSelectedSize(firstVariant.size || null);
+        } else {
+          setSelectedVariant(null);
+          setSelectedColor(null);
+          setSelectedStorage(null);
+          setSelectedRam(null);
+          setSelectedSize(null);
+        }
+
         window.scrollTo(0, 0);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Product not found');
@@ -64,6 +108,82 @@ export const ProductDetails: React.FC = () => {
 
     fetchProduct();
   }, [id]);
+
+  const handleVariantSelect = (type: 'color' | 'storage' | 'ram' | 'size', value: string) => {
+    if (!product || !product.variants) return;
+
+    const targetColor = type === 'color' ? value : selectedColor;
+    const targetStorage = type === 'storage' ? value : selectedStorage;
+    const targetRam = type === 'ram' ? value : selectedRam;
+    const targetSize = type === 'size' ? value : selectedSize;
+
+    let matched = product.variants.find((v) => {
+      let match = true;
+      if (targetColor && v.color) match = match && v.color === targetColor;
+      if (targetStorage && v.storage) match = match && v.storage === targetStorage;
+      if (targetRam && v.ram) match = match && v.ram === targetRam;
+      if (targetSize && v.size) match = match && v.size === targetSize;
+      return match;
+    });
+
+    if (!matched) {
+      matched = product.variants.find((v) => {
+        if (type === 'color') return v.color === value;
+        if (type === 'storage') return v.storage === value;
+        if (type === 'ram') return v.ram === value;
+        if (type === 'size') return v.size === value;
+        return false;
+      });
+    }
+
+    if (matched) {
+      setSelectedVariant(matched);
+      if (matched.color) setSelectedColor(matched.color);
+      if (matched.storage) setSelectedStorage(matched.storage);
+      if (matched.ram) setSelectedRam(matched.ram);
+      if (matched.size) setSelectedSize(matched.size);
+
+      if (matched.image && product.images) {
+        const imgIndex = product.images.findIndex((img) => img === matched?.image);
+        if (imgIndex !== -1) {
+          setSelectedImage(imgIndex);
+        }
+      }
+    }
+  };
+
+  const handleCheckPincode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = pincode.trim();
+    if (!cleanPin || cleanPin.length !== 6 || isNaN(Number(cleanPin))) {
+      setPincodeResult({
+        checked: true,
+        valid: false,
+        standardDate: '',
+        expressDate: '',
+        codAvailable: false,
+        message: 'Please enter a valid 6-digit Indian Postal PIN code.',
+      });
+      return;
+    }
+
+    const now = new Date();
+    const standardDelivery = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000);
+    const expressDelivery = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+    const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+    const effectivePrice = selectedVariant
+      ? (selectedVariant.discountPrice ?? selectedVariant.price)
+      : (product?.discountPrice ?? product?.price ?? 0);
+
+    setPincodeResult({
+      checked: true,
+      valid: true,
+      standardDate: standardDelivery.toLocaleDateString('en-IN', options),
+      expressDate: expressDelivery.toLocaleDateString('en-IN', options),
+      codAvailable: effectivePrice <= 50000,
+    });
+  };
 
   if (loading) {
     return (
@@ -86,27 +206,43 @@ export const ProductDetails: React.FC = () => {
     );
   }
 
+  const currentPrice = selectedVariant
+    ? (selectedVariant.discountPrice ?? selectedVariant.price)
+    : (product.discountPrice ?? product.price);
+
+  const regularPrice = selectedVariant ? selectedVariant.price : product.price;
+  const currentStock = selectedVariant ? selectedVariant.stock : product.stock;
+  const currentSku = selectedVariant ? selectedVariant.sku : product.sku;
+  const discountPercent = calculateDiscount(regularPrice, currentPrice);
+
   const images = product.images && product.images.length > 0
     ? product.images
+    : product.thumbnail
+    ? [product.thumbnail]
     : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'];
 
-  const discountPercent = calculateDiscount(product.price, product.discountPrice);
   const inWishlist = isInWishlist(product.id);
-  const isOutOfStock = product.stock <= 0;
+  const isOutOfStock = currentStock <= 0;
+
+  const availableColors = Array.from(new Set((product.variants || []).map((v) => v.color).filter(Boolean))) as string[];
+  const availableStorages = Array.from(new Set((product.variants || []).map((v) => v.storage).filter(Boolean))) as string[];
+  const availableRams = Array.from(new Set((product.variants || []).map((v) => v.ram).filter(Boolean))) as string[];
+  const availableSizes = Array.from(new Set((product.variants || []).map((v) => v.size).filter(Boolean))) as string[];
 
   const handleAddToCart = () => {
-    addToCart(product.id, quantity);
+    addToCart(product.id, quantity, selectedVariant?.id);
   };
 
   const handleBuyNow = async () => {
-    await addToCart(product.id, quantity);
+    await addToCart(product.id, quantity, selectedVariant?.id);
     navigate('/checkout');
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    setReviewError('');
     if (!isAuthenticated) {
-      alert('Please log in to submit a product review.');
+      setReviewError('Please log in to submit a product review.');
       return;
     }
     if (!newComment.trim()) return;
@@ -118,7 +254,6 @@ export const ProductDetails: React.FC = () => {
         title: newTitle.trim() || undefined,
         comment: newComment.trim(),
       });
-      // Append review
       setProduct((prev) =>
         prev
           ? {
@@ -132,8 +267,11 @@ export const ProductDetails: React.FC = () => {
       setNewTitle('');
       setReviewSuccess(true);
       setTimeout(() => setReviewSuccess(false), 3000);
-    } catch (err) {
-      alert('Failed to submit review');
+    } catch (err: any) {
+      setReviewError(
+        err.response?.data?.message ||
+          'Only verified purchasers who have ordered this product can submit a review.'
+      );
     } finally {
       setSubmittingReview(false);
     }
@@ -180,14 +318,18 @@ export const ProductDetails: React.FC = () => {
           )}
         </div>
 
-        {/* RIGHT: Product Meta & Purchase Controls */}
+        {/* RIGHT: Product Meta, Variant Switchers & Purchase Controls */}
         <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
           <div>
             {/* Category & Brand Breadcrumb */}
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              <span>{product.brand?.name || 'Brand'}</span>
+              <Link to={`/shop?brand=${product.brand?.slug}`} className="hover:underline">
+                {product.brand?.name || 'Brand'}
+              </Link>
               <span>•</span>
-              <span>{product.category?.name || 'Category'}</span>
+              <Link to={`/shop?category=${product.category?.slug}`} className="hover:underline">
+                {product.category?.name || 'Category'}
+              </Link>
             </div>
 
             <h1 className="mt-2 text-2xl sm:text-3xl font-black text-gray-900 dark:text-white leading-tight">
@@ -204,43 +346,220 @@ export const ProductDetails: React.FC = () => {
             </div>
 
             {/* Pricing Section */}
-            <div className="mt-6 flex items-baseline gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 dark:border-gray-800 dark:bg-gray-900/60">
-              <span className="text-3xl sm:text-4xl font-black text-gray-950 dark:text-white">
-                {formatPrice(product.discountPrice ?? product.price)}
-              </span>
-              {product.discountPrice && (
-                <>
-                  <span className="text-base text-gray-400 line-through">
-                    {formatPrice(product.price)}
+            <div className="mt-6 p-4 rounded-2xl bg-gray-50 border border-gray-100 dark:border-gray-800 dark:bg-gray-900/60">
+              <div className="flex items-baseline gap-4">
+                <span className="text-3xl sm:text-4xl font-black text-gray-950 dark:text-white">
+                  {formatPrice(currentPrice)}
+                </span>
+                {discountPercent > 0 && (
+                  <>
+                    <span className="text-base text-gray-400 line-through">
+                      {formatPrice(regularPrice)}
+                    </span>
+                    <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                      {discountPercent}% OFF
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* EMI Calculator Callout */}
+              <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                  <CreditCard className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>
+                    EMI starts at <strong>{formatPrice(Math.round(currentPrice / 12))}/mo</strong>
                   </span>
-                  <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
-                    {discountPercent}% OFF
-                  </span>
-                </>
-              )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEmiModalOpen(true)}
+                  className="font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 underline cursor-pointer"
+                >
+                  View EMI Plans
+                </button>
+              </div>
             </div>
 
-            {/* Brief description */}
-            <p className="mt-4 text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-              {product.description}
-            </p>
+            {/* 1. DYNAMIC PRODUCT VARIANTS: COLOR, STORAGE, RAM, SIZE */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="mt-6 space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
+                {/* Color Selector */}
+                {availableColors.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                      Color: <span className="text-indigo-600 dark:text-indigo-400">{selectedColor}</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableColors.map((color) => {
+                        const isSelected = selectedColor === color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => handleVariantSelect('color', color)}
+                            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition border ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500/20 dark:bg-indigo-950/50 dark:text-indigo-300'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                            }`}
+                          >
+                            {color}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Storage Selector */}
+                {availableStorages.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                      Storage: <span className="text-indigo-600 dark:text-indigo-400">{selectedStorage}</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableStorages.map((storage) => {
+                        const isSelected = selectedStorage === storage;
+                        return (
+                          <button
+                            key={storage}
+                            type="button"
+                            onClick={() => handleVariantSelect('storage', storage)}
+                            className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition border ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                            }`}
+                          >
+                            {storage}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* RAM Selector */}
+                {availableRams.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                      RAM: <span className="text-indigo-600 dark:text-indigo-400">{selectedRam}</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableRams.map((ram) => {
+                        const isSelected = selectedRam === ram;
+                        return (
+                          <button
+                            key={ram}
+                            type="button"
+                            onClick={() => handleVariantSelect('ram', ram)}
+                            className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition border ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                            }`}
+                          >
+                            {ram}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Size Selector */}
+                {availableSizes.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                      Size: <span className="text-indigo-600 dark:text-indigo-400">{selectedSize}</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSizes.map((size) => {
+                        const isSelected = selectedSize === size;
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => handleVariantSelect('size', size)}
+                            className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition border ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Availability and SKU */}
             <div className="mt-6 space-y-2 text-xs">
               <div className="flex items-center gap-2">
                 <span className="text-gray-400">Stock Availability:</span>
-                <strong className={product.stock > 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-500 font-bold'}>
-                  {product.stock > 0 ? `In Stock (${product.stock} units available)` : 'Out of Stock'}
+                <strong className={currentStock > 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-500 font-bold'}>
+                  {currentStock > 0 ? `In Stock (${currentStock} units available)` : 'Out of Stock'}
                 </strong>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <span>SKU:</span>
-                <strong className="text-gray-700 dark:text-gray-300">{product.sku}</strong>
+                <strong className="text-gray-700 dark:text-gray-300 font-mono">{currentSku}</strong>
               </div>
             </div>
 
+            {/* 2. POSTAL CODE DELIVERY CHECKER */}
+            <div className="mt-6 rounded-2xl border border-gray-200/80 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white mb-2">
+                <MapPin className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Check Delivery & Cash on Delivery Availability</span>
+              </div>
+              <form onSubmit={handleCheckPincode} className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="Enter 6-digit Indian PIN Code (e.g. 560001)"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+                <Button type="submit" size="sm" variant="secondary" className="whitespace-nowrap">
+                  Check
+                </Button>
+              </form>
+
+              {pincodeResult && (
+                <div className="mt-3 text-xs space-y-1.5">
+                  {pincodeResult.valid ? (
+                    <div className="rounded-xl bg-emerald-50/80 p-3 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Truck className="h-4 w-4" /> Deliverable to {pincode}
+                      </div>
+                      <p>
+                        • <strong>Standard Delivery (Free):</strong> By {pincodeResult.standardDate}
+                      </p>
+                      <p>
+                        • <strong>Express Delivery (₹99):</strong> By {pincodeResult.expressDate}
+                      </p>
+                      <p className={pincodeResult.codAvailable ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                        • {pincodeResult.codAvailable ? '✓ Cash on Delivery (COD) Available' : '⚠️ COD not available for orders above ₹50,000'}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-rose-600 dark:text-rose-400 font-medium">
+                      {pincodeResult.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Quantity Selector & Action Buttons */}
-            <div className="mt-8 space-y-4">
+            <div className="mt-6 space-y-4">
               <div className="flex items-center gap-4">
                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Quantity:</span>
                 <div className="flex items-center rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
@@ -254,7 +573,7 @@ export const ProductDetails: React.FC = () => {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
                     className="px-3.5 py-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300"
                   >
                     +
@@ -300,7 +619,7 @@ export const ProductDetails: React.FC = () => {
             <div className="flex flex-col items-center">
               <Truck className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mb-1" />
               <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200">Express Delivery</span>
-              <span className="text-[10px] text-gray-400">2-4 Days</span>
+              <span className="text-[10px] text-gray-400">1-2 Days Available</span>
             </div>
             <div className="flex flex-col items-center">
               <RotateCcw className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mb-1" />
@@ -425,11 +744,22 @@ export const ProductDetails: React.FC = () => {
             {/* Write a Review Form */}
             <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-gray-800/30">
               <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Write a Review</h4>
+              <p className="text-xs text-gray-500 mb-4">
+                Note: Only verified buyers who have received this product can post customer reviews.
+              </p>
+
               {reviewSuccess && (
                 <div className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-2">
                   <Check className="h-4 w-4" /> Thank you! Your review has been published.
                 </div>
               )}
+
+              {reviewError && (
+                <div className="mb-4 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" /> {reviewError}
+                </div>
+              )}
+
               <form onSubmit={handleSubmitReview} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -450,7 +780,7 @@ export const ProductDetails: React.FC = () => {
                   <textarea
                     required
                     rows={3}
-                    placeholder="Share your honest feedback about this product..."
+                    placeholder="Share your experience with this product..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
@@ -478,9 +808,16 @@ export const ProductDetails: React.FC = () => {
                           className="h-8 w-8 rounded-full object-cover"
                         />
                         <div>
-                          <p className="text-xs font-bold text-gray-900 dark:text-white">
-                            {rev.user?.name || 'Verified Buyer'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-gray-900 dark:text-white">
+                              {rev.user?.name || 'Customer'}
+                            </p>
+                            {rev.isVerifiedPurchase && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                                <Check className="h-3 w-3" /> Verified Buyer
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-gray-400">{formatDate(rev.createdAt)}</p>
                         </div>
                       </div>
@@ -498,7 +835,7 @@ export const ProductDetails: React.FC = () => {
                 ))
               ) : (
                 <p className="text-xs text-gray-400 py-4 text-center">
-                  No reviews yet. Be the first to review this product!
+                  No reviews yet. Verified purchasers can submit the first review!
                 </p>
               )}
             </div>
@@ -506,7 +843,7 @@ export const ProductDetails: React.FC = () => {
         )}
       </div>
 
-      {/* Related Products: "You may also like" */}
+      {/* Related Products */}
       {product.relatedProducts && product.relatedProducts.length > 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -526,6 +863,70 @@ export const ProductDetails: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 3. EMI PLANS CALCULATOR MODAL */}
+      <Modal
+        isOpen={isEmiModalOpen}
+        onClose={() => setIsEmiModalOpen(false)}
+        title="Easy EMI Payment Plans"
+        maxWidth="md"
+      >
+        <div className="space-y-4 p-4 sm:p-6 text-xs text-gray-700 dark:text-gray-300">
+          <div className="rounded-xl bg-indigo-50 p-3 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200">
+            <p className="font-bold">Total Order Value: {formatPrice(currentPrice)}</p>
+            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+              Available across HDFC, ICICI, SBI, Axis, and leading banks.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                <tr>
+                  <th className="p-2.5 font-bold">Tenure</th>
+                  <th className="p-2.5 font-bold">Interest Rate</th>
+                  <th className="p-2.5 font-bold">Monthly EMI</th>
+                  <th className="p-2.5 font-bold">Total Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                {[
+                  { months: 3, rate: 12 },
+                  { months: 6, rate: 14 },
+                  { months: 9, rate: 15 },
+                  { months: 12, rate: 16 },
+                ].map((plan) => {
+                  const interest = (currentPrice * plan.rate) / 100;
+                  const total = currentPrice + interest;
+                  const monthly = Math.round(total / plan.months);
+                  return (
+                    <tr key={plan.months} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="p-2.5 font-bold">{plan.months} Months</td>
+                      <td className="p-2.5">{plan.rate}% p.a.</td>
+                      <td className="p-2.5 font-bold text-indigo-600 dark:text-indigo-400">
+                        {formatPrice(monthly)}/mo
+                      </td>
+                      <td className="p-2.5 text-gray-500 dark:text-gray-400">
+                        {formatPrice(Math.round(total))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            * Interest rates are calculated as standard bank estimates. You can select your desired tenure during final checkout under the EMI payment method.
+          </p>
+
+          <div className="flex justify-end pt-2">
+            <Button size="sm" onClick={() => setIsEmiModalOpen(false)}>
+              Got it
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

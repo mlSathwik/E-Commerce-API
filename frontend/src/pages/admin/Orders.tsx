@@ -95,12 +95,13 @@ export const AdminOrders: React.FC = () => {
                       value={order.status}
                       disabled={updatingStatus}
                       onChange={(e) => handleUpdateStatus(order.id, e.target.value as OrderStatus)}
-                      className="rounded-xl border border-gray-200 bg-white p-1 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      className="rounded-xl border border-gray-200 bg-white p-1.5 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     >
                       <option value="PENDING">PENDING</option>
                       <option value="CONFIRMED">CONFIRMED</option>
                       <option value="PROCESSING">PROCESSING</option>
                       <option value="SHIPPED">SHIPPED</option>
+                      <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
                       <option value="DELIVERED">DELIVERED</option>
                       <option value="CANCELLED">CANCELLED</option>
                     </select>

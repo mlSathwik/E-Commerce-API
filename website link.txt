@@ -1,0 +1,9 @@
+https://shopsphere-blond.vercel.app/
+
+
+Admin:
+Email: admin@shopsphere.com
+Password: Admin@123456
+Customer:
+Email: customer@shopsphere.com
+Password: Customer@123456

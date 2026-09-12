@@ -33,4 +33,27 @@ export const productApi = {
     const res = await apiClient.delete<ApiResponse>(`/products/${id}`);
     return res.data;
   },
+
+  getSuggestions: async (query: string) => {
+    const res = await apiClient.get<ApiResponse<Array<{ id: string; name: string; price: number; discountPrice?: number | null; image?: string; category?: string }>>>(
+      `/products/search/suggestions?q=${encodeURIComponent(query)}`
+    );
+    return res.data;
+  },
+
+  getFilterOptions: async (category?: string) => {
+    const url = category
+      ? `/products/filters/options?category=${encodeURIComponent(category)}`
+      : '/products/filters/options';
+    const res = await apiClient.get<ApiResponse<{
+      categories: string[];
+      brands: string[];
+      colors: string[];
+      storage: string[];
+      ram: string[];
+      sizes: string[];
+      priceRange: { min: number; max: number };
+    }>>(url);
+    return res.data;
+  },
 };

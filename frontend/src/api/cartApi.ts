@@ -7,9 +7,10 @@ export const cartApi = {
     return res.data;
   },
 
-  addToCart: async (productId: string, quantity: number = 1) => {
+  addToCart: async (productId: string, quantity: number = 1, variantId?: string | null) => {
     const res = await apiClient.post<ApiResponse<Cart>>('/cart/add', {
       productId,
+      variantId,
       quantity,
     });
     return res.data;

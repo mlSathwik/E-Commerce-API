@@ -19,17 +19,43 @@ export const getCart = async (req: AuthenticatedRequest, res: Response) => {
       .filter((ci) => ci.cartId === cart!.id)
       .map((item) => {
         const product = store.products.find((p) => p.id === item.productId);
-        const effectivePrice = product ? (product.discountPrice ?? product.price) : 0;
+        if (!product) return null;
+
+        const variant = item.variantId
+          ? store.productVariants.find((v) => v.id === item.variantId)
+          : null;
+
+        const effectivePrice = variant
+          ? (variant.discountPrice ?? variant.price)
+          : (product.discountPrice ?? product.price);
+
+        const regularPrice = variant ? variant.price : product.price;
+        const availableStock = variant ? variant.stock : product.stock;
+        const itemImage = variant?.image || product.images?.[0] || product.thumbnail;
+
         return {
           id: item.id,
           productId: item.productId,
-          quantity: item.quantity,
-          product,
+          variantId: item.variantId || null,
+          variant: variant || null,
+          product: {
+            ...product,
+            images: product.images || (product.thumbnail ? [product.thumbnail] : []),
+          },
+          image: itemImage,
+          name: product.name,
+          variantDetails: variant
+            ? [variant.color, variant.storage, variant.ram, variant.size].filter(Boolean).join(' / ')
+            : null,
+          sku: variant?.sku || product.sku,
+          price: regularPrice,
           effectivePrice,
+          stock: availableStock,
+          quantity: item.quantity,
           subtotal: effectivePrice * item.quantity,
         };
       })
-      .filter((item) => item.product !== undefined);
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
     // Free shipping threshold ₹1000
@@ -58,7 +84,7 @@ export const getCart = async (req: AuthenticatedRequest, res: Response) => {
 export const addToCart = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { productId, quantity = 1 } = req.body;
+    const { productId, variantId, quantity = 1 } = req.body;
     const qty = Math.max(1, parseInt(quantity, 10));
     const store = getMemoryStore();
 
@@ -67,8 +93,22 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response) => {
       return sendError(res, 404, 'Product not found', 'PRODUCT_NOT_FOUND');
     }
 
-    if (product.stock < qty) {
-      return sendError(res, 400, `Insufficient stock! Only ${product.stock} units available`, 'INSUFFICIENT_STOCK');
+    let variant: any = null;
+    if (variantId) {
+      variant = store.productVariants.find((v) => v.id === variantId && v.productId === productId);
+      if (!variant) {
+        return sendError(res, 404, 'Selected product variant not found', 'VARIANT_NOT_FOUND');
+      }
+    }
+
+    const availableStock = variant ? variant.stock : product.stock;
+    if (availableStock < qty) {
+      return sendError(
+        res,
+        400,
+        `Insufficient stock! Only ${availableStock} units available for this selection.`,
+        'INSUFFICIENT_STOCK'
+      );
     }
 
     let cart = store.carts.find((c) => c.userId === userId);
@@ -77,11 +117,19 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response) => {
       store.carts.push(cart);
     }
 
-    let existingItem = store.cartItems.find((ci) => ci.cartId === cart!.id && ci.productId === productId);
+    let existingItem = store.cartItems.find(
+      (ci) => ci.cartId === cart!.id && ci.productId === productId && (ci.variantId || null) === (variantId || null)
+    );
+
     if (existingItem) {
       const newQuantity = existingItem.quantity + qty;
-      if (newQuantity > product.stock) {
-        return sendError(res, 400, `Cannot add more. Only ${product.stock} units available in total`, 'INSUFFICIENT_STOCK');
+      if (newQuantity > availableStock) {
+        return sendError(
+          res,
+          400,
+          `Cannot add more. Only ${availableStock} units available in total`,
+          'INSUFFICIENT_STOCK'
+        );
       }
       existingItem.quantity = newQuantity;
       existingItem.updatedAt = new Date();
@@ -90,6 +138,7 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response) => {
         id: crypto.randomUUID(),
         cartId: cart.id,
         productId,
+        variantId: variantId || null,
         quantity: qty,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -119,11 +168,16 @@ export const updateCartItem = async (req: AuthenticatedRequest, res: Response) =
       return sendError(res, 404, 'Product not found', 'PRODUCT_NOT_FOUND');
     }
 
+    const variant = item.variantId
+      ? store.productVariants.find((v) => v.id === item.variantId)
+      : null;
+    const availableStock = variant ? variant.stock : product.stock;
+
     if (qty <= 0) {
       store.cartItems = store.cartItems.filter((ci) => ci.id !== itemId);
     } else {
-      if (qty > product.stock) {
-        return sendError(res, 400, `Only ${product.stock} units available`, 'INSUFFICIENT_STOCK');
+      if (qty > availableStock) {
+        return sendError(res, 400, `Only ${availableStock} units available`, 'INSUFFICIENT_STOCK');
       }
       item.quantity = qty;
       item.updatedAt = new Date();

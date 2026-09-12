@@ -5,11 +5,12 @@ export type OrderStatus =
   | 'CONFIRMED'
   | 'PROCESSING'
   | 'SHIPPED'
+  | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED';
 
-export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-export type PaymentMethod = 'RAZORPAY' | 'COD';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+export type PaymentMethod = 'RAZORPAY' | 'EMI' | 'COD';
 
 export interface User {
   id: string;
@@ -32,6 +33,7 @@ export interface Address {
   state: string;
   postalCode: string;
   country: string;
+  addressType?: 'HOME' | 'WORK' | 'OTHER';
   isDefault?: boolean;
 }
 
@@ -54,6 +56,41 @@ export interface Brand {
   productCount?: number;
 }
 
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  color?: string | null;
+  storage?: string | null;
+  ram?: string | null;
+  size?: string | null;
+  processor?: string | null;
+  screenSize?: string | null;
+  price: number;
+  discountPrice?: number | null;
+  stock: number;
+  image?: string | null;
+  isActive: boolean;
+}
+
+export interface DeliveryOption {
+  id: string;
+  name: string;
+  code: string;
+  cost: number;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  isActive: boolean;
+}
+
+export interface EMIPlan {
+  id: string;
+  months: number;
+  interestRate: number;
+  minAmount: number;
+  isActive: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -70,10 +107,14 @@ export interface Product {
   isFlashSale?: boolean;
   specifications?: Record<string, string>;
   images?: string[];
+  thumbnail?: string;
   categoryId: string;
   category?: Category;
   brandId: string;
   brand?: Brand;
+  variants?: ProductVariant[];
+  deliveryOptions?: DeliveryOption[];
+  emiPlans?: EMIPlan[];
   reviews?: Review[];
   relatedProducts?: Product[];
   createdAt?: string;
@@ -83,8 +124,16 @@ export interface Product {
 export interface CartItem {
   id: string;
   productId: string;
+  variantId?: string | null;
+  variant?: ProductVariant | null;
   quantity: number;
   product: Product;
+  name?: string;
+  image?: string;
+  sku?: string;
+  variantDetails?: string | null;
+  stock?: number;
+  price?: number;
   effectivePrice: number;
   subtotal: number;
 }
@@ -117,8 +166,13 @@ export interface Wishlist {
 export interface OrderItem {
   id: string;
   productId: string;
+  variantId?: string | null;
   product?: Product;
+  variant?: ProductVariant | null;
+  variantDetails?: string | null;
   name: string;
+  sku?: string;
+  image?: string;
   price: number;
   quantity: number;
   subtotal: number;
@@ -139,19 +193,27 @@ export interface Order {
   orderNumber: string;
   userId: string;
   status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
   totalAmount: number;
   subtotal: number;
   taxAmount: number;
   shippingAmount: number;
+  deliveryCost?: number;
   discountAmount: number;
   deliveryMethod: string;
   deliveryEstimate?: string;
+  estimatedDeliveryDate?: string;
+  trackingNumber?: string;
+  emiMonths?: number | null;
+  emiMonthlyAmount?: number | null;
   couponCode?: string;
   notes?: string;
   createdAt: string;
   items: OrderItem[];
   payment?: Payment;
   address?: Address;
+  shippingAddress?: Address;
   customer?: {
     name: string;
     email: string;
@@ -166,11 +228,12 @@ export interface Review {
   userId: string;
   user?: {
     name: string;
-    avatar?: string;
+    avatar?: string | null;
   };
   rating: number;
   title?: string;
   comment: string;
+  isVerifiedPurchase?: boolean;
   createdAt: string;
 }
 
@@ -225,4 +288,8 @@ export interface ProductFilters {
   featured?: boolean;
   trending?: boolean;
   flashSale?: boolean;
+  color?: string;
+  storage?: string;
+  ram?: string;
+  size?: string;
 }

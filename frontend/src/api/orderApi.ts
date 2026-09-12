@@ -7,6 +7,8 @@ export const orderApi = {
     shippingAddress?: any;
     deliveryMethod?: string;
     paymentMethod?: string;
+    emiPlanId?: string;
+    emiMonths?: number | string;
     couponCode?: string;
     notes?: string;
   }) => {
@@ -28,8 +30,11 @@ export const orderApi = {
     return res.data;
   },
 
-  updateOrderStatus: async (id: string, status: string) => {
-    const res = await apiClient.put<ApiResponse<Order>>(`/orders/${id}/status`, { status });
+  updateOrderStatus: async (id: string, status: string, trackingNumber?: string) => {
+    const res = await apiClient.put<ApiResponse<Order>>(`/orders/${id}/status`, {
+      status,
+      trackingNumber,
+    });
     return res.data;
   },
 };

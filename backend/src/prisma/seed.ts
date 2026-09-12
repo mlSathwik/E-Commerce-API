@@ -1,10 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import {
+  seedCategories,
+  seedBrands,
+  seedDeliveryOptions,
+  seedEmiPlans,
+  seedProducts,
+  seedProductVariants,
+  seedProductImages,
+} from '../services/catalog.data.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('🌱 Starting database seed with 180+ products and 1100+ variants...');
 
   const hashedPassword = await bcrypt.hash('Admin@123456', 10);
   const customerPassword = await bcrypt.hash('Customer@123456', 10);
@@ -40,22 +49,106 @@ async function main() {
   });
 
   // 3. Create Address
-  await prisma.address.create({
-    data: {
+  await prisma.address.upsert({
+    where: { id: '33333333-3333-3333-3333-333333333333' },
+    update: {},
+    create: {
       id: '33333333-3333-3333-3333-333333333333',
       userId: customer.id,
       fullName: 'Alex Johnson',
       phone: '+91 9876543211',
       street: '42 Tech Park Avenue, Cyber City',
+      addressLine2: 'Tower B, Suite 402',
       city: 'Bengaluru',
       state: 'Karnataka',
       postalCode: '560100',
       country: 'India',
+      addressType: 'HOME',
       isDefault: true,
     },
   });
 
-  console.log('✅ Seed completed successfully!');
+  // 4. Delivery Options
+  for (const del of seedDeliveryOptions) {
+    await prisma.deliveryOption.upsert({
+      where: { code: del.code },
+      update: {},
+      create: del,
+    });
+  }
+
+  // 5. EMI Plans
+  for (const emi of seedEmiPlans) {
+    await prisma.eMIPlan.upsert({
+      where: { months: emi.months },
+      update: {},
+      create: emi,
+    });
+  }
+
+  // 6. Categories (11 Active Categories)
+  for (const cat of seedCategories) {
+    await prisma.category.upsert({
+      where: { slug: cat.slug },
+      update: { name: cat.name, description: cat.description, icon: cat.icon, image: cat.image },
+      create: cat,
+    });
+  }
+
+  // 7. Brands
+  for (const br of seedBrands) {
+    await prisma.brand.upsert({
+      where: { slug: br.slug },
+      update: { name: br.name, description: br.description, logo: br.logo },
+      create: br,
+    });
+  }
+
+  // 8. Products
+  for (const p of seedProducts) {
+    const { variants, images, ...prodData } = p;
+    await prisma.product.upsert({
+      where: { slug: p.slug },
+      update: {
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        discountPrice: p.discountPrice,
+        sku: p.sku,
+        stock: p.stock,
+        rating: p.rating,
+        numReviews: p.numReviews,
+        isFeatured: p.isFeatured,
+        isTrending: p.isTrending,
+        isFlashSale: p.isFlashSale,
+      },
+      create: prodData,
+    });
+  }
+
+  // 9. Product Variants
+  for (const v of seedProductVariants) {
+    await prisma.productVariant.upsert({
+      where: { sku: v.sku },
+      update: {
+        price: v.price,
+        discountPrice: v.discountPrice,
+        stock: v.stock,
+      },
+      create: v,
+    });
+  }
+
+  // 10. Product Images
+  for (const img of seedProductImages) {
+    await prisma.productImage.upsert({
+      where: { id: img.id },
+      update: {},
+      create: img,
+    });
+  }
+
+  console.log('✅ Seed completed successfully with full active catalog!');
 }
 
 main()

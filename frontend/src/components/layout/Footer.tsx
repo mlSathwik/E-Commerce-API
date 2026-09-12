@@ -118,8 +118,10 @@ export const Footer: React.FC = () => {
               <li><Link to="/shop" className="hover:text-indigo-600">All Products</Link></li>
               <li><Link to="/deals" className="hover:text-indigo-600">Flash Sale & Deals</Link></li>
               <li><Link to="/shop?category=smartphones" className="hover:text-indigo-600">Smartphones</Link></li>
-              <li><Link to="/shop?category=laptops-computers" className="hover:text-indigo-600">Laptops & PCs</Link></li>
-              <li><Link to="/shop?category=audio-headphones" className="hover:text-indigo-600">Audio Gear</Link></li>
+              <li><Link to="/shop?category=laptops" className="hover:text-indigo-600">Laptops</Link></li>
+              <li><Link to="/shop?category=audio" className="hover:text-indigo-600">Audio</Link></li>
+              <li><Link to="/shop?category=smartwatches" className="hover:text-indigo-600">Smartwatches</Link></li>
+              <li><Link to="/shop?category=gaming" className="hover:text-indigo-600">Gaming</Link></li>
             </ul>
           </div>
 

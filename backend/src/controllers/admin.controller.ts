@@ -12,7 +12,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const totalCustomers = store.users.filter((u) => u.role === 'CUSTOMER').length;
     const totalProducts = store.products.length;
 
-    // 2. Sales by Category (for Recharts Pie / Donut chart)
+    // 2. Sales by Category (Strictly 11 Active Categories)
     const salesByCategory = store.categories.map((cat) => {
       const catProducts = store.products.filter((p) => p.categoryId === cat.id);
       const catProductIds = new Set(catProducts.map((p) => p.id));
@@ -20,23 +20,51 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       const value = orderItems.reduce((sum, oi) => sum + oi.subtotal, 0);
       return {
         name: cat.name,
-        value: value > 0 ? value : Math.floor(Math.random() * 50000 + 10000), // realistic aesthetic data
+        value: value > 0 ? value : Math.floor(Math.random() * 40000 + 15000),
       };
-    }).slice(0, 5);
+    });
 
     // 3. Revenue & Orders Trend (Last 7 days)
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const revenueTrend = days.map((day, idx) => ({
       day,
-      revenue: Math.floor(25000 + idx * 8000 + Math.random() * 12000),
-      orders: Math.floor(5 + idx * 2 + Math.random() * 4),
+      revenue: Math.floor(45000 + idx * 9500 + Math.random() * 15000),
+      orders: Math.floor(8 + idx * 3 + Math.random() * 5),
     }));
 
-    // 4. Top Selling Products
+    // 4. Payment Method Distribution
+    const paymentMethods = [
+      {
+        method: 'RAZORPAY',
+        name: 'Razorpay / UPI / Cards',
+        orders: store.orders.filter((o) => o.paymentMethod === 'RAZORPAY').length || 18,
+        revenue: store.orders
+          .filter((o) => o.paymentMethod === 'RAZORPAY')
+          .reduce((sum, o) => sum + o.totalAmount, 0) || 450000,
+      },
+      {
+        method: 'EMI',
+        name: 'Easy EMI',
+        orders: store.orders.filter((o) => o.paymentMethod === 'EMI').length || 12,
+        revenue: store.orders
+          .filter((o) => o.paymentMethod === 'EMI')
+          .reduce((sum, o) => sum + o.totalAmount, 0) || 580000,
+      },
+      {
+        method: 'COD',
+        name: 'Cash on Delivery',
+        orders: store.orders.filter((o) => o.paymentMethod === 'COD').length || 8,
+        revenue: store.orders
+          .filter((o) => o.paymentMethod === 'COD')
+          .reduce((sum, o) => sum + o.totalAmount, 0) || 120000,
+      },
+    ];
+
+    // 5. Top Selling Products
     const topProducts = store.products
       .slice()
       .sort((a, b) => b.numReviews - a.numReviews)
-      .slice(0, 5)
+      .slice(0, 6)
       .map((p) => ({
         id: p.id,
         name: p.name,
@@ -45,11 +73,11 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         stock: p.stock,
         rating: p.rating,
         salesCount: p.numReviews * 3 + 12,
-        image: p.images?.[0],
+        image: p.images?.[0] || p.thumbnail,
       }));
 
-    // 5. Recent Orders
-    const recentOrders = store.orders.slice(0, 5).map((o) => {
+    // 6. Recent Orders
+    const recentOrders = store.orders.slice(0, 8).map((o) => {
       const user = store.users.find((u) => u.id === o.userId);
       return {
         id: o.id,
@@ -57,11 +85,13 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         customerName: user ? user.name : 'Customer',
         totalAmount: o.totalAmount,
         status: o.status,
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
         createdAt: o.createdAt,
       };
     });
 
-    // 6. Low stock alert count
+    // 7. Low stock alert count
     const lowStockCount = store.products.filter((p) => p.stock <= 5).length;
 
     return sendSuccess(res, 200, 'Dashboard statistics fetched', {
@@ -74,6 +104,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       },
       revenueTrend,
       salesByCategory,
+      paymentMethods,
       topProducts,
       recentOrders,
     });
@@ -88,11 +119,11 @@ export const getAnalytics = async (req: Request, res: Response) => {
     const store = getMemoryStore();
 
     let labels: string[] = [];
-    if (range === '7d') {
-      labels = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
-    } else if (range === '30d') {
+    if (range === '7d' || range === 'daily') {
+      labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    } else if (range === '30d' || range === 'weekly') {
       labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    } else if (range === '90d') {
+    } else if (range === '90d' || range === 'monthly') {
       labels = ['Month 1', 'Month 2', 'Month 3'];
     } else {
       labels = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -100,19 +131,34 @@ export const getAnalytics = async (req: Request, res: Response) => {
 
     const performanceData = labels.map((label, i) => ({
       label,
-      revenue: Math.floor(65000 + i * 25000 + Math.random() * 20000),
-      orders: Math.floor(25 + i * 10 + Math.random() * 15),
-      customers: Math.floor(15 + i * 6 + Math.random() * 8),
-      conversionRate: parseFloat((2.8 + Math.random() * 1.5).toFixed(2)),
+      revenue: Math.floor(125000 + i * 45000 + Math.random() * 30000),
+      orders: Math.floor(35 + i * 15 + Math.random() * 20),
+      customers: Math.floor(20 + i * 10 + Math.random() * 12),
+      conversionRate: parseFloat((3.2 + Math.random() * 1.6).toFixed(2)),
+    }));
+
+    const paymentMethods = [
+      { name: 'Razorpay / Cards / UPI', method: 'RAZORPAY', value: 45, color: '#3B82F6' },
+      { name: 'Easy EMI', method: 'EMI', value: 35, color: '#10B981' },
+      { name: 'Cash on Delivery (COD)', method: 'COD', value: 20, color: '#F59E0B' },
+    ];
+
+    const categoryBreakdown = store.categories.map((c) => ({
+      name: c.name,
+      slug: c.slug,
+      productCount: store.products.filter((p) => p.categoryId === c.id).length,
+      revenueEstimate: Math.floor(Math.random() * 90000 + 40000),
     }));
 
     return sendSuccess(res, 200, 'Analytics data fetched', {
       range,
       performanceData,
+      paymentMethods,
+      categoryBreakdown,
       summary: {
-        growth: '+24.5%',
-        averageOrderValue: 4850,
-        repeatCustomerRate: '38.2%',
+        growth: '+28.4%',
+        averageOrderValue: 12450,
+        repeatCustomerRate: '41.8%',
       },
     });
   } catch (error: any) {
@@ -152,6 +198,9 @@ export const getInventory = async (req: Request, res: Response) => {
     const store = getMemoryStore();
     const inventory = store.products.map((p) => {
       const category = store.categories.find((c) => c.id === p.categoryId);
+      const brand = store.brands.find((b) => b.id === p.brandId);
+      const variants = store.productVariants.filter((v) => v.productId === p.id);
+
       let status = 'In Stock';
       if (p.stock === 0) status = 'Out of Stock';
       else if (p.stock <= 5) status = 'Low Stock';
@@ -162,9 +211,18 @@ export const getInventory = async (req: Request, res: Response) => {
         sku: p.sku,
         stock: p.stock,
         category: category?.name,
+        brand: brand?.name,
         price: p.discountPrice ?? p.price,
+        variantCount: variants.length,
+        variants: variants.map((v) => ({
+          id: v.id,
+          sku: v.sku,
+          spec: [v.color, v.storage, v.ram, v.size].filter(Boolean).join(' / '),
+          price: v.discountPrice ?? v.price,
+          stock: v.stock,
+        })),
         status,
-        image: p.images?.[0],
+        image: p.images?.[0] || p.thumbnail,
       };
     });
 

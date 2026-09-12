@@ -184,6 +184,101 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </div>
       </div>
 
+      {/* Dynamic Category-Specific Filter: Storage & RAM (Tech) */}
+      {['smartphones', 'laptops', 'tablets'].includes(filters.category || '') && (
+        <div className="space-y-4 border-t border-gray-100 pt-5 dark:border-gray-800">
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Storage Capacity
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {['64GB', '128GB', '256GB', '512GB', '1TB'].map((cap) => (
+                <button
+                  key={cap}
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      ...filters,
+                      storage: filters.storage === cap ? undefined : cap,
+                      page: 1,
+                    })
+                  }
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium border transition ${
+                    filters.storage === cap
+                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                  }`}
+                >
+                  {cap}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              RAM
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {['8GB', '12GB', '16GB', '24GB', '32GB', '64GB'].map((ram) => (
+                <button
+                  key={ram}
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      ...filters,
+                      ram: filters.ram === ram ? undefined : ram,
+                      page: 1,
+                    })
+                  }
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium border transition ${
+                    filters.ram === ram
+                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                  }`}
+                >
+                  {ram}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Category-Specific Filter: Sizes (Fashion & Shoes) */}
+      {['fashion', 'shoes'].includes(filters.category || '') && (
+        <div className="space-y-2.5 border-t border-gray-100 pt-5 dark:border-gray-800">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Size
+          </h4>
+          <div className="flex flex-wrap gap-1.5">
+            {(filters.category === 'shoes'
+              ? ['UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11']
+              : ['S', 'M', 'L', 'XL', 'XXL']
+            ).map((size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...filters,
+                    size: filters.size === size ? undefined : size,
+                    page: 1,
+                  })
+                }
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-medium border transition ${
+                  filters.size === size
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                }`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stock Availability */}
       <div className="border-t border-gray-100 pt-5 dark:border-gray-800">
         <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">

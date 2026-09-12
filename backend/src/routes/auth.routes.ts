@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   register,
   login,
+  adminLogin,
+  adminRegister,
   refreshToken,
   logout,
   getMe,
@@ -23,6 +25,8 @@ const router = Router();
 
 router.post('/register', validateRequest(registerSchema), register);
 router.post('/login', validateRequest(loginSchema), login);
+router.post('/admin-login', validateRequest(loginSchema), adminLogin);
+router.post('/admin-register', adminRegister);
 router.post('/refresh', validateRequest(refreshTokenSchema), refreshToken);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);

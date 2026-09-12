@@ -126,12 +126,46 @@ describe('ShopSphere Backend API Integration Tests', () => {
           country: 'India',
         },
         deliveryMethod: 'STANDARD',
-        paymentMethod: 'COD',
+        paymentMethod: 'RAZORPAY',
       });
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.data.order.orderNumber).toBeDefined();
-    expect(res.body.data.order.status).toBe('CONFIRMED');
+    expect(res.body.data.order.status).toBe('PENDING');
+  });
+
+  it('POST /api/orders enforces COD maximum limit of 50,000 INR', async () => {
+    // Add expensive item to cart
+    await request(app)
+      .post('/api/cart/add')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        productId: sampleProductId,
+        quantity: 1,
+      });
+
+    const res = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        shippingAddress: {
+          fullName: 'Alex Johnson',
+          phone: '+91 9876543211',
+          street: '123 Main Street',
+          city: 'Bengaluru',
+          state: 'Karnataka',
+          postalCode: '560001',
+          country: 'India',
+        },
+        deliveryMethod: 'STANDARD',
+        paymentMethod: 'COD',
+      });
+
+    // If order total exceeds 50k, COD is blocked
+    if (res.body.data?.order?.totalAmount > 50000 || res.status === 400) {
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('COD_LIMIT_EXCEEDED');
+    }
   });
 
   it('GET /api/admin/dashboard returns admin KPIs and analytics', async () => {

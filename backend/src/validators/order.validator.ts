@@ -13,7 +13,9 @@ export const createOrderSchema = z.object({
       country: z.string().default('India'),
     }).optional(),
     deliveryMethod: z.enum(['STANDARD', 'EXPRESS']).default('STANDARD'),
-    paymentMethod: z.enum(['RAZORPAY', 'COD']).default('RAZORPAY'),
+    paymentMethod: z.enum(['RAZORPAY', 'COD', 'EMI']).default('RAZORPAY'),
+    emiPlanId: z.string().optional(),
+    emiMonths: z.union([z.string(), z.number()]).optional(),
     couponCode: z.string().optional(),
     notes: z.string().optional(),
   }),
@@ -24,6 +26,15 @@ export const updateOrderStatusSchema = z.object({
     id: z.string().min(1, 'Invalid Order ID'),
   }),
   body: z.object({
-    status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']),
+    status: z.enum([
+      'PENDING',
+      'CONFIRMED',
+      'PROCESSING',
+      'SHIPPED',
+      'OUT_FOR_DELIVERY',
+      'DELIVERED',
+      'CANCELLED',
+    ]),
+    trackingNumber: z.string().optional(),
   }),
 });

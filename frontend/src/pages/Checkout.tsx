@@ -10,11 +10,17 @@ import {
   Plus,
   ArrowRight,
   Check,
+  AlertTriangle,
+  Sparkles,
+  Home as HomeIcon,
+  Briefcase,
+  Building2,
 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { orderApi } from '../api/orderApi.js';
 import { paymentApi } from '../api/paymentApi.js';
+import { couponApi } from '../api/couponApi.js';
 import { formatPrice } from '../utils/formatters.js';
 import { Button } from '../components/common/Button.js';
 
@@ -28,7 +34,6 @@ export const Checkout: React.FC = () => {
   const [error, setError] = useState('');
 
   // Step 1: Address
-  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [shippingAddress, setShippingAddress] = useState({
     fullName: user?.name || 'Alex Johnson',
     phone: user?.phone || '+91 9876543211',
@@ -37,13 +42,25 @@ export const Checkout: React.FC = () => {
     state: 'Karnataka',
     postalCode: '560100',
     country: 'India',
+    addressType: 'HOME' as 'HOME' | 'WORK' | 'OTHER',
   });
 
   // Step 2: Delivery Option
   const [deliveryMethod, setDeliveryMethod] = useState<'STANDARD' | 'EXPRESS'>('STANDARD');
 
   // Step 3: Payment Method
-  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>('RAZORPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'EMI' | 'COD'>('RAZORPAY');
+  const [selectedEmiMonths, setSelectedEmiMonths] = useState<number>(6);
+
+  // Coupon code state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountAmount: number;
+    description: string;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -64,13 +81,48 @@ export const Checkout: React.FC = () => {
   }
 
   const subtotal = cart.subtotal;
-  const deliveryCost = subtotal >= 1000 ? 0 : deliveryMethod === 'EXPRESS' ? 149 : 99;
-  const tax = Math.round(subtotal * 0.05);
-  const totalAmount = subtotal + deliveryCost + tax;
+  const deliveryCost = deliveryMethod === 'EXPRESS' ? 99 : 0;
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const tax = Math.round(taxableAmount * 0.05); // 5% GST
+  const totalAmount = taxableAmount + deliveryCost + tax;
+
+  const isCodAllowed = totalAmount <= 50000;
+
+  // Handle Coupon Apply
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode.trim()) return;
+
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const res = await couponApi.validateCoupon(couponCode.trim(), subtotal);
+      if (res.success && res.data) {
+        setAppliedCoupon({
+          code: res.data.coupon.code || couponCode.trim().toUpperCase(),
+          discountAmount: res.data.discountAmount,
+          description: `${res.data.coupon.discountValue}% OFF discount applied`,
+        });
+        setCouponCode('');
+      }
+    } catch (err: any) {
+      setCouponError(err.response?.data?.message || 'Invalid or expired coupon code.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     setLoading(true);
     setError('');
+
+    // Pre-flight check: COD limit
+    if (paymentMethod === 'COD' && totalAmount > 50000) {
+      setError('Cash on Delivery is limited to ₹50,000. Please select Razorpay or EMI.');
+      setLoading(false);
+      return;
+    }
 
     try {
       // 1. Create order on backend
@@ -78,13 +130,15 @@ export const Checkout: React.FC = () => {
         shippingAddress,
         deliveryMethod,
         paymentMethod,
+        emiMonths: paymentMethod === 'EMI' ? selectedEmiMonths : undefined,
+        couponCode: appliedCoupon?.code,
       });
 
       const order = res.data.order;
       const razorpayOrder = res.data.razorpayOrder;
 
-      // 2. If COD, finish directly
-      if (paymentMethod === 'COD') {
+      // 2. If COD or direct EMI confirmation, navigate to success
+      if (paymentMethod === 'COD' || paymentMethod === 'EMI') {
         await refreshCart();
         navigate(`/order-success/${order.id}`);
         return;
@@ -133,7 +187,7 @@ export const Checkout: React.FC = () => {
           });
           rzp.open();
         } else {
-          // In test / offline environments, simulate successful payment
+          // In test / offline simulation environments
           await paymentApi.verifyPayment({
             orderId: order.id,
             razorpayOrderId: razorpayOrder?.id || `order_${Date.now()}`,
@@ -204,6 +258,33 @@ export const Checkout: React.FC = () => {
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">Shipping Address</h2>
               </div>
 
+              {/* Address Type Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Address Type
+                </label>
+                <div className="flex gap-3">
+                  {[
+                    { type: 'HOME', label: 'Home', icon: HomeIcon },
+                    { type: 'WORK', label: 'Work', icon: Briefcase },
+                    { type: 'OTHER', label: 'Other', icon: Building2 },
+                  ].map(({ type, label, icon: Icon }) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setShippingAddress({ ...shippingAddress, addressType: type as any })}
+                      className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition border ${
+                        shippingAddress.addressType === type
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" /> {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -233,11 +314,12 @@ export const Checkout: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Postal / Zip Code *
+                    Postal / PIN Code (6 digits) *
                   </label>
                   <input
                     type="text"
                     required
+                    maxLength={6}
                     value={shippingAddress.postalCode}
                     onChange={(e) => setShippingAddress({ ...shippingAddress, postalCode: e.target.value })}
                     className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -246,7 +328,7 @@ export const Checkout: React.FC = () => {
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Street Address / Flat No. *
+                    Street Address / Flat No. / Building *
                   </label>
                   <input
                     type="text"
@@ -297,7 +379,7 @@ export const Checkout: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
                 <Truck className="h-5 w-5 text-indigo-600" />
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Choose Delivery Option</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Choose Delivery Speed</h2>
               </div>
 
               <div className="space-y-4">
@@ -315,11 +397,11 @@ export const Checkout: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-gray-900 dark:text-white">Standard Delivery (3-5 Business Days)</h4>
-                      <p className="text-[11px] text-gray-500">Free on orders above ₹1,000</p>
+                      <p className="text-[11px] text-gray-500">Free courier shipping with tracking</p>
                     </div>
                   </div>
-                  <span className="text-xs font-extrabold text-gray-900 dark:text-white">
-                    {subtotal >= 1000 ? 'FREE' : '₹99'}
+                  <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                    FREE
                   </span>
                 </label>
 
@@ -341,7 +423,7 @@ export const Checkout: React.FC = () => {
                     </div>
                   </div>
                   <span className="text-xs font-extrabold text-gray-900 dark:text-white">
-                    {subtotal >= 1000 ? 'FREE' : '₹149'}
+                    ₹99
                   </span>
                 </label>
               </div>
@@ -362,10 +444,11 @@ export const Checkout: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
                 <CreditCard className="h-5 w-5 text-indigo-600" />
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Payment Method</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Select Payment Method</h2>
               </div>
 
               <div className="space-y-4">
+                {/* 1. Razorpay */}
                 <label
                   onClick={() => setPaymentMethod('RAZORPAY')}
                   className={`flex items-center justify-between rounded-2xl border-2 p-4 cursor-pointer transition ${
@@ -380,34 +463,124 @@ export const Checkout: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-gray-900 dark:text-white">
-                        Online Payment (Razorpay: UPI, Cards, NetBanking, Wallets)
+                        Online Payment (Razorpay: UPI, Credit/Debit Cards, NetBanking)
                       </h4>
-                      <p className="text-[11px] text-gray-500">Encrypted and verified on server</p>
+                      <p className="text-[11px] text-gray-500">100% Secure 256-bit SSL encrypted transaction</p>
                     </div>
                   </div>
                   <ShieldCheck className="h-5 w-5 text-indigo-600" />
                 </label>
 
-                <label
-                  onClick={() => setPaymentMethod('COD')}
-                  className={`flex items-center justify-between rounded-2xl border-2 p-4 cursor-pointer transition ${
-                    paymentMethod === 'COD'
+                {/* 2. Easy EMI */}
+                <div
+                  className={`rounded-2xl border-2 p-4 transition ${
+                    paymentMethod === 'EMI'
                       ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20'
                       : 'border-gray-200 dark:border-gray-700'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${paymentMethod === 'COD' ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-400'}`}>
-                      {paymentMethod === 'COD' && <Check className="h-3 w-3" />}
+                  <div
+                    onClick={() => setPaymentMethod('EMI')}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${paymentMethod === 'EMI' ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-400'}`}>
+                        {paymentMethod === 'EMI' && <Check className="h-3 w-3" />}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                          Easy Monthly Installments (EMI)
+                        </h4>
+                        <p className="text-[11px] text-gray-500">Flexible 3, 6, 9, or 12 month payment plans</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-900 dark:text-white">
-                        Cash on Delivery (COD)
-                      </h4>
-                      <p className="text-[11px] text-gray-500">Pay with cash or UPI upon package arrival</p>
-                    </div>
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                      From {formatPrice(Math.round(totalAmount / 12))}/mo
+                    </span>
                   </div>
-                </label>
+
+                  {paymentMethod === 'EMI' && (
+                    <div className="mt-4 pt-4 border-t border-indigo-100 dark:border-gray-800 space-y-3">
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                        Choose EMI Tenure:
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { months: 3, rate: 12 },
+                          { months: 6, rate: 14 },
+                          { months: 9, rate: 15 },
+                          { months: 12, rate: 16 },
+                        ].map((plan) => {
+                          const interest = (totalAmount * plan.rate) / 100;
+                          const monthly = Math.round((totalAmount + interest) / plan.months);
+                          const isSelected = selectedEmiMonths === plan.months;
+
+                          return (
+                            <button
+                              key={plan.months}
+                              type="button"
+                              onClick={() => setSelectedEmiMonths(plan.months)}
+                              className={`rounded-xl border p-2.5 text-center text-xs transition ${
+                                isSelected
+                                  ? 'border-indigo-600 bg-white font-bold text-indigo-700 shadow-sm dark:bg-gray-800 dark:text-indigo-300 ring-2 ring-indigo-500/20'
+                                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400'
+                              }`}
+                            >
+                              <div className="font-bold">{plan.months} Months</div>
+                              <div className="text-indigo-600 dark:text-indigo-400 text-xs font-extrabold mt-0.5">
+                                {formatPrice(monthly)}/mo
+                              </div>
+                              <div className="text-[10px] text-gray-400">{plan.rate}% interest</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Cash on Delivery (COD with ₹50,000 max check) */}
+                <div
+                  className={`rounded-2xl border-2 p-4 transition ${
+                    !isCodAllowed
+                      ? 'border-gray-200 bg-gray-50/70 opacity-70 cursor-not-allowed dark:border-gray-800 dark:bg-gray-900/30'
+                      : paymentMethod === 'COD'
+                      ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 cursor-pointer'
+                      : 'border-gray-200 dark:border-gray-700 cursor-pointer'
+                  }`}
+                  onClick={() => {
+                    if (isCodAllowed) setPaymentMethod('COD');
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${paymentMethod === 'COD' && isCodAllowed ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-400'}`}>
+                        {paymentMethod === 'COD' && isCodAllowed && <Check className="h-3 w-3" />}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                          Cash on Delivery (COD)
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          {isCodAllowed
+                            ? 'Pay with cash or UPI QR upon courier arrival'
+                            : 'COD is limited to orders up to ₹50,000.'}
+                        </p>
+                      </div>
+                    </div>
+                    {!isCodAllowed && (
+                      <span className="flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <AlertTriangle className="h-3 w-3" /> Exceeds ₹50k Limit
+                      </span>
+                    )}
+                  </div>
+
+                  {!isCodAllowed && (
+                    <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">
+                      Orders exceeding ₹50,000 must be paid via Razorpay (UPI / Card) or Easy EMI for insurance and security purposes.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 flex justify-between">
@@ -426,7 +599,7 @@ export const Checkout: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
                 <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Review & Confirm</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Review & Confirm Order</h2>
               </div>
 
               {/* Items summary */}
@@ -435,13 +608,22 @@ export const Checkout: React.FC = () => {
                   <div key={item.id} className="py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <img
-                        src={item.product?.images?.[0]}
-                        alt={item.product?.name}
-                        className="h-12 w-12 rounded-xl object-cover"
+                        src={item.image || item.product?.images?.[0] || item.product?.thumbnail}
+                        alt={item.name || item.product?.name}
+                        className="h-12 w-12 rounded-xl object-contain bg-gray-50 dark:bg-gray-800 p-1"
                       />
                       <div>
-                        <h5 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1">{item.product?.name}</h5>
-                        <p className="text-[11px] text-gray-400">Qty: {item.quantity} × {formatPrice(item.effectivePrice)}</p>
+                        <h5 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1">
+                          {item.name || item.product?.name}
+                        </h5>
+                        {item.variantDetails && (
+                          <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                            {item.variantDetails}
+                          </span>
+                        )}
+                        <p className="text-[11px] text-gray-400">
+                          Qty: {item.quantity} × {formatPrice(item.effectivePrice)}
+                        </p>
                       </div>
                     </div>
                     <span className="text-xs font-bold text-gray-900 dark:text-white">{formatPrice(item.subtotal)}</span>
@@ -449,26 +631,37 @@ export const Checkout: React.FC = () => {
                 ))}
               </div>
 
-              {/* Shipping & Payment confirmation block */}
+              {/* Delivery & Payment Preview */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800/40 text-xs">
                 <div>
-                  <h5 className="font-bold text-gray-900 dark:text-white">Shipping To:</h5>
-                  <p className="text-gray-600 dark:text-gray-300 mt-1">{shippingAddress.fullName}</p>
+                  <h6 className="font-bold text-gray-900 dark:text-white mb-1">Delivering To:</h6>
+                  <p className="text-gray-600 dark:text-gray-300">{shippingAddress.fullName} ({shippingAddress.addressType})</p>
                   <p className="text-gray-500">{shippingAddress.street}, {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.postalCode}</p>
                   <p className="text-gray-500">Phone: {shippingAddress.phone}</p>
                 </div>
                 <div>
-                  <h5 className="font-bold text-gray-900 dark:text-white">Method & Payment:</h5>
-                  <p className="text-gray-600 dark:text-gray-300 mt-1">Delivery: {deliveryMethod === 'EXPRESS' ? 'Priority Express' : 'Standard Delivery'}</p>
-                  <p className="text-gray-500">Payment: {paymentMethod === 'RAZORPAY' ? 'Razorpay Online' : 'Cash on Delivery'}</p>
+                  <h6 className="font-bold text-gray-900 dark:text-white mb-1">Selected Payment:</h6>
+                  <p className="text-indigo-600 dark:text-indigo-400 font-bold">
+                    {paymentMethod === 'RAZORPAY' && 'Online Payment (Razorpay)'}
+                    {paymentMethod === 'EMI' && `Easy EMI (${selectedEmiMonths} Months @ ~${formatPrice(Math.round(totalAmount / selectedEmiMonths))}/mo)`}
+                    {paymentMethod === 'COD' && 'Cash on Delivery (COD)'}
+                  </p>
+                  <p className="text-gray-500 mt-1">
+                    Delivery Speed: {deliveryMethod === 'EXPRESS' ? 'Priority Express (1-2 Days)' : 'Standard Delivery (3-5 Days)'}
+                  </p>
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-between items-center">
+              <div className="pt-4 flex justify-between">
                 <Button onClick={() => setStep(3)} variant="outline" size="md">
                   Back
                 </Button>
-                <Button onClick={handlePlaceOrder} loading={loading} size="lg" className="gap-2 shadow-lg shadow-indigo-500/20">
+                <Button
+                  onClick={handlePlaceOrder}
+                  loading={loading}
+                  size="lg"
+                  className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black"
+                >
                   Place Order ({formatPrice(totalAmount)}) <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -476,28 +669,80 @@ export const Checkout: React.FC = () => {
           )}
         </div>
 
-        {/* Right Side Order Summary */}
-        <div className="lg:col-span-4 rounded-3xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 space-y-4">
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">Summary</h3>
-          <div className="space-y-2 text-xs border-b border-gray-100 pb-4 dark:border-gray-800">
-            <div className="flex justify-between text-gray-500 dark:text-gray-400">
+        {/* ORDER SUMMARY SIDEBAR WITH COUPON */}
+        <div className="lg:col-span-4 rounded-3xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 space-y-6">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white pb-3 border-b border-gray-100 dark:border-gray-800">
+            Order Summary
+          </h3>
+
+          {/* Coupon Code Input */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Have a Promo Code?
+            </label>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="font-bold flex items-center gap-1">
+                  <Check className="h-3.5 w-3.5" /> {appliedCoupon.code} applied!
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAppliedCoupon(null)}
+                  className="text-xs font-bold text-rose-600 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Code (e.g. WELCOME10)"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  className="w-full rounded-xl border border-gray-300 p-2 text-xs uppercase text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+                <Button type="submit" size="sm" loading={couponLoading}>
+                  Apply
+                </Button>
+              </form>
+            )}
+            {couponError && <p className="text-[11px] text-rose-600">{couponError}</p>}
+          </div>
+
+          {/* Breakdown */}
+          <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="flex justify-between">
               <span>Items Subtotal</span>
               <span className="font-semibold text-gray-900 dark:text-white">{formatPrice(subtotal)}</span>
             </div>
-            <div className="flex justify-between text-gray-500 dark:text-gray-400">
-              <span>Shipping</span>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span>Coupon Discount</span>
+                <span>-{formatPrice(discountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span>Estimated Shipping</span>
               <span className="font-semibold text-gray-900 dark:text-white">
                 {deliveryCost === 0 ? 'FREE' : formatPrice(deliveryCost)}
               </span>
             </div>
-            <div className="flex justify-between text-gray-500 dark:text-gray-400">
-              <span>Tax (5% GST)</span>
+            <div className="flex justify-between">
+              <span>Taxes (5% GST)</span>
               <span className="font-semibold text-gray-900 dark:text-white">{formatPrice(tax)}</span>
             </div>
+            <div className="flex justify-between border-t border-gray-200 pt-3 text-sm font-black text-gray-950 dark:border-gray-800 dark:text-white">
+              <span>Total Payable</span>
+              <span className="text-indigo-600 dark:text-indigo-400">{formatPrice(totalAmount)}</span>
+            </div>
           </div>
-          <div className="flex justify-between text-base font-black text-gray-900 dark:text-white">
-            <span>Total</span>
-            <span className="text-indigo-600 dark:text-indigo-400">{formatPrice(totalAmount)}</span>
+
+          <div className="rounded-xl bg-gray-50 p-3 text-[11px] text-gray-500 dark:bg-gray-800/40 space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-gray-700 dark:text-gray-300">
+              <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" /> Buyer Protection Included
+            </div>
+            <p>Your order qualifies for 30-day returns and genuine brand replacement guarantee.</p>
           </div>
         </div>
       </div>

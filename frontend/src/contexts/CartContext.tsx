@@ -9,7 +9,7 @@ interface CartContextType {
   itemCount: number;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
-  addToCart: (productId: string, quantity?: number) => Promise<void>;
+  addToCart: (productId: string, quantity?: number, variantId?: string | null) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -44,10 +44,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshCart();
   }, [isAuthenticated]);
 
-  const addToCart = async (productId: string, quantity: number = 1) => {
+  const addToCart = async (productId: string, quantity: number = 1, variantId?: string | null) => {
     try {
       setLoading(true);
-      const res = await cartApi.addToCart(productId, quantity);
+      const res = await cartApi.addToCart(productId, quantity, variantId);
       setCart(res.data);
       setIsCartOpen(true); // Pop open cart drawer or alert
     } finally {

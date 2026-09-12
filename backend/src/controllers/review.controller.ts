@@ -29,6 +29,29 @@ export const createProductReview = async (req: AuthenticatedRequest, res: Respon
       return sendError(res, 404, 'Product not found', 'PRODUCT_NOT_FOUND');
     }
 
+    // Check if user already reviewed this product
+    const alreadyReviewed = store.reviews.some((r) => r.productId === productId && r.userId === userId);
+    if (alreadyReviewed) {
+      return sendError(res, 400, 'You have already submitted a review for this product', 'ALREADY_REVIEWED');
+    }
+
+    // Verified Purchaser Check: user must have an active or completed order containing this product
+    const userOrders = store.orders.filter((o) => o.userId === userId && o.status !== 'CANCELLED');
+    const isVerifiedPurchase =
+      req.user!.role === 'ADMIN' ||
+      userOrders.some((o) =>
+        store.orderItems.some((oi) => oi.orderId === o.id && oi.productId === productId)
+      );
+
+    if (!isVerifiedPurchase) {
+      return sendError(
+        res,
+        403,
+        'Only verified purchasers who have ordered this product can submit a review.',
+        'NOT_VERIFIED_PURCHASER'
+      );
+    }
+
     const user = store.users.find((u) => u.id === userId);
 
     const newReview = {
@@ -42,6 +65,7 @@ export const createProductReview = async (req: AuthenticatedRequest, res: Respon
       rating: parseInt(rating, 10),
       title: title || null,
       comment,
+      isVerifiedPurchase: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

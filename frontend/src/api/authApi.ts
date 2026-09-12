@@ -43,4 +43,20 @@ export const authApi = {
     const res = await apiClient.post<ApiResponse>('/auth/reset-password', data);
     return res.data;
   },
+
+  adminLogin: async (credentials: { email: string; password: string }) => {
+    const res = await apiClient.post<ApiResponse<{ user: User; accessToken: string; refreshToken: string }>>(
+      '/auth/admin/login',
+      credentials
+    );
+    return res.data;
+  },
+
+  adminRegister: async (data: { name: string; email: string; password: string; adminCode: string; phone?: string }) => {
+    const res = await apiClient.post<ApiResponse<{ user: User; accessToken: string; refreshToken: string }>>(
+      '/auth/admin/register',
+      data
+    );
+    return res.data;
+  },
 };

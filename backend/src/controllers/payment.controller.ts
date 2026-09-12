@@ -59,7 +59,8 @@ export const verifyPayment = async (req: AuthenticatedRequest, res: Response) =>
       payment.updatedAt = new Date();
     }
 
-    order.status = 'PROCESSING';
+    order.paymentStatus = 'PAID';
+    order.status = 'CONFIRMED';
     order.updatedAt = new Date();
 
     // Create user notification
