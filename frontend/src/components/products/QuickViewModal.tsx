@@ -84,17 +84,20 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
             <span className="text-xs text-gray-400">({product.numReviews} customer reviews)</span>
           </div>
 
-          <div className="mt-3 flex items-baseline gap-3">
+          <div className="mt-3 flex items-baseline gap-3 flex-wrap">
             <span className="text-2xl font-black text-gray-900 dark:text-white">
               {formatPrice(product.discountPrice ?? product.price)}
             </span>
             {product.discountPrice && (
               <>
                 <span className="text-sm text-gray-400 line-through">
-                  {formatPrice(product.price)}
+                  MRP: {formatPrice(product.price)}
                 </span>
                 <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-extrabold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                   {discountPercent}% OFF
+                </span>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  You Save: {formatPrice(product.price - product.discountPrice)}
                 </span>
               </>
             )}

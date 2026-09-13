@@ -47,7 +47,8 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleWishlist = async (product: Product) => {
     if (!isAuthenticated) {
-      alert('Please log in to save items to your wishlist.');
+      const currentPath = window.location.pathname + window.location.search;
+      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
       return;
     }
     try {

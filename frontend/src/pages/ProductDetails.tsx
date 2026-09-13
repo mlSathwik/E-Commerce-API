@@ -28,6 +28,7 @@ import { ProductCard } from '../components/products/ProductCard.js';
 import { useCart } from '../contexts/CartContext.js';
 import { useWishlist } from '../contexts/WishlistContext.js';
 import { useAuth } from '../contexts/AuthContext.js';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed.js';
 
 export const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +36,7 @@ export const ProductDetails: React.FC = () => {
   const { addToCart, loading: cartLoading } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { isAuthenticated } = useAuth();
+  const { recentlyViewed } = useRecentlyViewed(id);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -234,6 +236,10 @@ export const ProductDetails: React.FC = () => {
   };
 
   const handleBuyNow = async () => {
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(`/products/${id}`)}`);
+      return;
+    }
     await addToCart(product.id, quantity, selectedVariant?.id);
     navigate('/checkout');
   };
@@ -242,7 +248,7 @@ export const ProductDetails: React.FC = () => {
     e.preventDefault();
     setReviewError('');
     if (!isAuthenticated) {
-      setReviewError('Please log in to submit a product review.');
+      navigate(`/login?redirect=${encodeURIComponent(`/products/${id}`)}`);
       return;
     }
     if (!newComment.trim()) return;
@@ -354,10 +360,13 @@ export const ProductDetails: React.FC = () => {
                 {discountPercent > 0 && (
                   <>
                     <span className="text-base text-gray-400 line-through">
-                      {formatPrice(regularPrice)}
+                      MRP: {formatPrice(regularPrice)}
                     </span>
                     <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                       {discountPercent}% OFF
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      You Save {formatPrice(regularPrice - currentPrice)}
                     </span>
                   </>
                 )}
@@ -859,6 +868,24 @@ export const ProductDetails: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {product.relatedProducts.map((rel) => (
               <ProductCard key={rel.id} product={rel} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* RECENTLY VIEWED PRODUCTS */}
+      {recentlyViewed && recentlyViewed.length > 0 && (
+        <div className="mt-16 border-t border-gray-100 dark:border-gray-800/80 pt-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-black text-gray-950 dark:text-white">Recently Viewed Products</h3>
+              <p className="text-xs text-gray-500">Products you have explored recently</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+            {recentlyViewed.map((item) => (
+              <ProductCard key={item.id} product={item} />
             ))}
           </div>
         </div>

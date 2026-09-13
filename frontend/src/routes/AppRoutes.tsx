@@ -105,6 +105,8 @@ export const AppRoutes: React.FC = () => {
       <Route element={<CustomerLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/search" element={<Shop />} />
+        <Route path="/products" element={<Shop />} />
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/deals" element={<Deals />} />

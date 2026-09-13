@@ -95,16 +95,13 @@ export const catalogService = {
       }
     }
 
-    // Search query
+    // Multi-token intelligent search across Name, Brand, Category, SKU, Description, Specs
     if (filters.search) {
-      const q = filters.search.toLowerCase().trim();
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          p.brand?.name.toLowerCase().includes(q) ||
-          p.category?.name.toLowerCase().includes(q)
-      );
+      const tokens = filters.search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      filtered = filtered.filter((p) => {
+        const searchableText = `${p.name} ${p.description} ${p.sku} ${p.brand?.name || ''} ${p.category?.name || ''}`.toLowerCase();
+        return tokens.every((token) => searchableText.includes(token));
+      });
     }
 
     // Price range

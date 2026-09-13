@@ -134,14 +134,24 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
           {/* Pricing & Add to Cart */}
           <div className="mt-auto pt-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
-            <div>
-              <span className="text-base font-extrabold text-gray-950 dark:text-white">
-                {formatPrice(product.discountPrice ?? product.price)}
-              </span>
-              {product.discountPrice && (
-                <span className="ml-2 text-xs text-gray-400 line-through">
-                  {formatPrice(product.price)}
+            <div className="flex flex-col">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-base font-extrabold text-gray-950 dark:text-white">
+                  {formatPrice(product.discountPrice ?? product.price)}
                 </span>
+                {product.discountPrice && (
+                  <span className="text-xs text-gray-400 line-through">
+                    MRP: {formatPrice(product.price)}
+                  </span>
+                )}
+              </div>
+              {product.discountPrice && product.discountPrice < product.price && (
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span>Save {formatPrice(product.price - product.discountPrice)}</span>
+                  <span className="rounded bg-emerald-50 px-1 py-0.2 text-[10px] dark:bg-emerald-950/50">
+                    {discountPercent}% OFF
+                  </span>
+                </div>
               )}
             </div>
 

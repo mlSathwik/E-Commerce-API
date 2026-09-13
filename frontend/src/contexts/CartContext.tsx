@@ -45,6 +45,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated]);
 
   const addToCart = async (productId: string, quantity: number = 1, variantId?: string | null) => {
+    if (!isAuthenticated) {
+      const currentPath = window.location.pathname + window.location.search;
+      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+      return;
+    }
     try {
       setLoading(true);
       const res = await cartApi.addToCart(productId, quantity, variantId);

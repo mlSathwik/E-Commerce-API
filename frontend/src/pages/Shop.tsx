@@ -23,10 +23,12 @@ export const Shop: React.FC = () => {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   // Initialize filters from URL parameters
+  const getSearchQuery = () => searchParams.get('q') || searchParams.get('search') || undefined;
+
   const [filters, setFilters] = useState<ProductFilters>({
     page: parseInt(searchParams.get('page') || '1', 10),
     limit: 12,
-    search: searchParams.get('search') || undefined,
+    search: getSearchQuery(),
     category: searchParams.get('category') || undefined,
     brand: searchParams.get('brand') || undefined,
     sort: searchParams.get('sort') || 'featured',
@@ -36,11 +38,21 @@ export const Shop: React.FC = () => {
     inStock: searchParams.get('inStock') === 'true' ? true : undefined,
   });
 
+  // Keep search in sync when navigation query changes (e.g. /search?q=iphone)
+  useEffect(() => {
+    const q = getSearchQuery();
+    if (q !== filters.search) {
+      setFilters((prev) => ({ ...prev, search: q, page: 1 }));
+    }
+  }, [searchParams]);
+
   // Sync URL search params
   useEffect(() => {
     const params: Record<string, string> = {};
     if (filters.page && filters.page > 1) params.page = String(filters.page);
-    if (filters.search) params.search = filters.search;
+    if (filters.search) {
+      params.q = filters.search;
+    }
     if (filters.category) params.category = filters.category;
     if (filters.brand) params.brand = filters.brand;
     if (filters.sort && filters.sort !== 'featured') params.sort = filters.sort;
@@ -109,7 +121,7 @@ export const Shop: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-gray-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-950 dark:text-white">
-            Explore All Products
+            {filters.search ? `Search Results for "${filters.search}"` : 'Explore All Products'}
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             {totalCount > 0
