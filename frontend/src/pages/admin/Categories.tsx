@@ -71,7 +71,7 @@ export const AdminCategories: React.FC = () => {
           >
             <div className="flex items-center gap-3">
               <img
-                src={cat.image || 'https://images.unsplash.com/photo-1511707171634-5f897ff02560?auto=format&fit=crop&w=100&q=80'}
+                src={cat.image || 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=100&q=80'}
                 alt={cat.name}
                 className="h-12 w-12 rounded-2xl object-cover"
               />

@@ -17,8 +17,19 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email.trim() || email.trim().toLowerCase() === 'you@example.com') {
+      setError('Please enter a valid email address (e.g. customer@shopsphere.com)');
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password');
+      return;
+    }
+
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       navigate(redirect);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
@@ -27,6 +38,11 @@ export const Login: React.FC = () => {
 
   const handleDemo = async (role: 'admin' | 'customer') => {
     setError('');
+    const demoEmail = role === 'admin' ? 'admin@shopsphere.com' : 'customer@shopsphere.com';
+    const demoPassword = role === 'admin' ? 'Admin@123456' : 'Customer@123456';
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+
     try {
       await quickDemoLogin(role);
       if (role === 'admin') {
@@ -35,7 +51,7 @@ export const Login: React.FC = () => {
         navigate(redirect);
       }
     } catch (err: any) {
-      setError('Demo login failed');
+      setError('Demo login failed. Please try again.');
     }
   };
 
@@ -65,14 +81,14 @@ export const Login: React.FC = () => {
             <button
               type="button"
               onClick={() => handleDemo('customer')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-white p-2 text-xs font-bold text-indigo-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-indigo-300"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-white p-2 text-xs font-bold text-indigo-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-indigo-300 transition-colors"
             >
               <User className="h-3.5 w-3.5" /> Customer Demo
             </button>
             <button
               type="button"
               onClick={() => handleDemo('admin')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 p-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 p-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition-colors"
             >
               <ShieldCheck className="h-3.5 w-3.5" /> Admin Demo
             </button>
@@ -97,7 +113,7 @@ export const Login: React.FC = () => {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 p-2.5 pl-10 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                className="w-full rounded-xl border border-gray-300 p-2.5 pl-10 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
               />
               <Mail className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
             </div>
@@ -119,7 +135,7 @@ export const Login: React.FC = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 p-2.5 pl-10 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                className="w-full rounded-xl border border-gray-300 p-2.5 pl-10 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
               />
               <Lock className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
             </div>

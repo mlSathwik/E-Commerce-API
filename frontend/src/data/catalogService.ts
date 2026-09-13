@@ -33,7 +33,7 @@ export const allProducts: Product[] = seedProducts.map((p) => {
     .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
     .map((img) => img.url);
 
-  const primaryImage = images[0] || 'https://images.unsplash.com/photo-1511707171634-5f897ff02560?auto=format&fit=crop&w=800&q=80';
+  const primaryImage = images[0] || 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=800&q=80';
   const category = categoryMap.get(p.categoryId);
   const brand = brandMap.get(p.brandId);
   const variants: ProductVariant[] = seedProductVariants

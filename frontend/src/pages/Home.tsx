@@ -220,7 +220,7 @@ export const Home: React.FC = () => {
             >
               <div className="h-20 w-20 overflow-hidden rounded-2xl mb-3 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                 <img
-                  src={cat.image || 'https://images.unsplash.com/photo-1511707171634-5f897ff02560?auto=format&fit=crop&w=200&q=80'}
+                  src={cat.image || 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=200&q=80'}
                   alt={cat.name}
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
                 />
