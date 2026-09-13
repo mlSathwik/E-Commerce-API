@@ -73,11 +73,12 @@ export const createApp = (): Express => {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Static uploads directory
-  const uploadsPath = path.resolve(process.cwd(), 'uploads');
+  const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
+  const uploadsPath = path.resolve(rootDir, 'backend', 'uploads');
   app.use('/uploads', express.static(uploadsPath));
 
   // Swagger API Documentation UI
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use('/api/docs', ...(swaggerUi.serve as any), swaggerUi.setup(swaggerSpec) as any);
   app.get('/api/docs.json', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
@@ -109,8 +110,8 @@ export const createApp = (): Express => {
   app.use('/api/admin', adminRoutes);
   app.use('/api/upload', uploadRoutes);
 
-  // 404 Handler
-  app.use((req: Request, res: Response) => {
+  // 404 Handler for API routes
+  app.all('/api/*', (req: Request, res: Response) => {
     return sendError(res, 404, `Cannot ${req.method} ${req.originalUrl}`, 'ENDPOINT_NOT_FOUND');
   });
 
