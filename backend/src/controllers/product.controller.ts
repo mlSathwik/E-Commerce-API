@@ -8,7 +8,7 @@ export const getProducts = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 12;
-    const search = (req.query.search as string)?.trim().toLowerCase();
+    const search = ((req.query.q as string) || (req.query.search as string))?.trim().toLowerCase();
     const category = (req.query.category as string)?.trim().toLowerCase();
     const brand = (req.query.brand as string)?.trim().toLowerCase();
     const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined;
@@ -34,22 +34,62 @@ export const getProducts = async (req: Request, res: Response) => {
     const store = getMemoryStore();
     let filtered = [...store.products];
 
-    // Multi-token intelligent search across Name, Brand, Category, SKU, Description, Specs, Variants
+    // Multi-token intelligent search with weighted relevance scoring
     if (search) {
       const tokens = search.split(/\s+/).filter(Boolean);
-      filtered = filtered.filter((p) => {
+      const scored: { product: any; score: number }[] = [];
+
+      for (const p of filtered) {
         const cat = store.categories.find((c) => c.id === p.categoryId);
         const br = store.brands.find((b) => b.id === p.brandId);
         const pVariants = store.productVariants.filter((v) => v.productId === p.id);
-        const varColors = pVariants.map((v) => v.color || '').join(' ');
-        const varStorages = pVariants.map((v) => v.storage || '').join(' ');
-        const varSizes = pVariants.map((v) => v.size || '').join(' ');
-        const specStr = p.specifications ? JSON.stringify(p.specifications) : '';
+        const varColors = pVariants.map((v) => v.color || '').join(' ').toLowerCase();
+        const varStorages = pVariants.map((v) => v.storage || '').join(' ').toLowerCase();
+        const varSizes = pVariants.map((v) => v.size || '').join(' ').toLowerCase();
+        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
 
-        const searchableText = `${p.name} ${p.description} ${p.sku} ${cat?.name || ''} ${br?.name || ''} ${specStr} ${varColors} ${varStorages} ${varSizes}`.toLowerCase();
+        const nameLower = p.name.toLowerCase();
+        const descLower = p.description.toLowerCase();
+        const skuLower = p.sku.toLowerCase();
+        const brandLower = (br?.name || '').toLowerCase();
+        const catLower = (cat?.name || '').toLowerCase();
 
-        return tokens.every((token) => searchableText.includes(token));
-      });
+        const searchableText = `${nameLower} ${descLower} ${skuLower} ${catLower} ${brandLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+
+        if (tokens.every((token) => searchableText.includes(token))) {
+          let score = 0;
+          // Exact name match or starts with
+          if (nameLower === search) score += 200;
+          else if (nameLower.startsWith(search)) score += 150;
+          else if (nameLower.includes(search)) score += 100;
+
+          // Brand exact match or token match
+          if (brandLower === search) score += 120;
+          else if (brandLower.includes(search)) score += 80;
+
+          // Category match
+          if (catLower === search) score += 70;
+          else if (catLower.includes(search)) score += 40;
+
+          // Token-level scoring
+          for (const token of tokens) {
+            if (nameLower.includes(token)) score += 40;
+            if (brandLower.includes(token)) score += 35;
+            if (catLower.includes(token)) score += 25;
+            if (skuLower.includes(token)) score += 30;
+            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 20;
+            if (specStr.includes(token)) score += 15;
+            if (descLower.includes(token)) score += 5;
+          }
+
+          scored.push({ product: p, score });
+        }
+      }
+
+      if (sort === 'featured') {
+        scored.sort((a, b) => b.score - a.score);
+      }
+      filtered = scored.map((s) => s.product);
     }
 
     // Category filter

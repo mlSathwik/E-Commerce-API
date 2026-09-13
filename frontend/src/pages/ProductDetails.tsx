@@ -145,12 +145,8 @@ export const ProductDetails: React.FC = () => {
       if (matched.ram) setSelectedRam(matched.ram);
       if (matched.size) setSelectedSize(matched.size);
 
-      if (matched.image && product.images) {
-        const imgIndex = product.images.findIndex((img) => img === matched?.image);
-        if (imgIndex !== -1) {
-          setSelectedImage(imgIndex);
-        }
-      }
+      // Immediately switch to the variant's specific image
+      setSelectedImage(0);
     }
   };
 
@@ -217,11 +213,23 @@ export const ProductDetails: React.FC = () => {
   const currentSku = selectedVariant ? selectedVariant.sku : product.sku;
   const discountPercent = calculateDiscount(regularPrice, currentPrice);
 
-  const images = product.images && product.images.length > 0
-    ? product.images
-    : product.thumbnail
-    ? [product.thumbnail]
-    : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'];
+  const images = React.useMemo(() => {
+    const list: string[] = [];
+    if (selectedVariant?.image) {
+      list.push(selectedVariant.image);
+    }
+    if (product.images && product.images.length > 0) {
+      for (const img of product.images) {
+        if (!list.includes(img)) list.push(img);
+      }
+    } else if (product.thumbnail && !list.includes(product.thumbnail)) {
+      list.push(product.thumbnail);
+    }
+    if (list.length === 0) {
+      list.push('https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80');
+    }
+    return list;
+  }, [product, selectedVariant?.image]);
 
   const inWishlist = isInWishlist(product.id);
   const isOutOfStock = currentStock <= 0;
@@ -232,12 +240,16 @@ export const ProductDetails: React.FC = () => {
   const availableSizes = Array.from(new Set((product.variants || []).map((v) => v.size).filter(Boolean))) as string[];
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
     addToCart(product.id, quantity, selectedVariant?.id);
   };
 
   const handleBuyNow = async () => {
     if (!isAuthenticated) {
-      navigate(`/login?redirect=${encodeURIComponent(`/products/${id}`)}`);
+      navigate(`/login?redirect=/checkout`);
       return;
     }
     await addToCart(product.id, quantity, selectedVariant?.id);
@@ -295,6 +307,7 @@ export const ProductDetails: React.FC = () => {
                 src={images[selectedImage]}
                 alt={product.name}
                 className="h-full w-full object-contain p-4 transition-transform duration-300 hover:scale-110"
+                referrerPolicy="no-referrer"
               />
             </div>
             {discountPercent > 0 && (
@@ -317,7 +330,7 @@ export const ProductDetails: React.FC = () => {
                       : 'border-transparent opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="" className="h-full w-full object-contain" />
+                  <img src={img} alt="" className="h-full w-full object-contain" referrerPolicy="no-referrer" />
                 </button>
               ))}
             </div>
@@ -609,7 +622,13 @@ export const ProductDetails: React.FC = () => {
                   <Zap className="h-5 w-5" /> Buy Now
                 </Button>
                 <button
-                  onClick={() => toggleWishlist(product)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+                      return;
+                    }
+                    toggleWishlist(product);
+                  }}
                   aria-label="Wishlist"
                   className={`flex h-12 w-12 items-center justify-center rounded-xl border transition ${
                     inWishlist

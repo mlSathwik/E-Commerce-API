@@ -108,7 +108,6 @@ export const AppRoutes: React.FC = () => {
         <Route path="/search" element={<Shop />} />
         <Route path="/products" element={<Shop />} />
         <Route path="/products/:id" element={<ProductDetails />} />
-        <Route path="/cart" element={<Cart />} />
         <Route path="/deals" element={<Deals />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/login" element={<Login />} />
@@ -117,6 +116,14 @@ export const AppRoutes: React.FC = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Customer Protected Routes */}
+        <Route
+          path="/cart"
+          element={
+            <ProtectedCustomerRoute>
+              <Cart />
+            </ProtectedCustomerRoute>
+          }
+        />
         <Route
           path="/checkout"
           element={

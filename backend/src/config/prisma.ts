@@ -1,40 +1,17 @@
-import { PrismaClient } from '@prisma/client';
+// MOCKED — in-memory proxy for Prisma in AI Studio container
+const noOp = {
+  findMany: async () => [],
+  findFirst: async () => null,
+  findUnique: async () => null,
+  create: async (d: any) => d?.data ?? {},
+  update: async (d: any) => d?.data ?? {},
+  delete: async () => ({}),
+  upsert: async (d: any) => d?.create ?? {},
+  $queryRaw: async () => {
+    throw new Error('PostgreSQL database offline');
+  },
+  $disconnect: async () => {},
+  $connect: async () => {},
+};
 
-let prisma: any;
-
-declare global {
-  var __prisma: any | undefined;
-}
-
-try {
-  if (process.env.NODE_ENV === 'production') {
-    prisma = new PrismaClient();
-  } else {
-    if (!global.__prisma) {
-      global.__prisma = new PrismaClient({
-        log: ['error', 'warn'],
-      });
-    }
-    prisma = global.__prisma;
-  }
-} catch (error) {
-  // If prisma client was not generated yet or fails to initialize
-  prisma = new Proxy(
-    {},
-    {
-      get: (_target, prop) => {
-        if (prop === '$queryRaw') {
-          return async () => {
-            throw new Error('Prisma engine offline');
-          };
-        }
-        if (prop === '$disconnect' || prop === '$connect') {
-          return async () => {};
-        }
-        return undefined;
-      },
-    }
-  );
-}
-
-export { prisma };
+export const prisma: any = new Proxy({}, { get: () => noOp });

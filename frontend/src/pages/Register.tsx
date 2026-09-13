@@ -24,7 +24,7 @@ export const Register: React.FC = () => {
 
     setError('');
     try {
-      await register({ name, email, password, phone });
+      await register({ name, email, password, phone, confirmPassword });
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');

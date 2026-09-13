@@ -95,13 +95,54 @@ export const catalogService = {
       }
     }
 
-    // Multi-token intelligent search across Name, Brand, Category, SKU, Description, Specs
+    // Search query with multi-token weighted scoring
     if (filters.search) {
-      const tokens = filters.search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-      filtered = filtered.filter((p) => {
-        const searchableText = `${p.name} ${p.description} ${p.sku} ${p.brand?.name || ''} ${p.category?.name || ''}`.toLowerCase();
-        return tokens.every((token) => searchableText.includes(token));
-      });
+      const q = filters.search.toLowerCase().trim();
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const scored: { product: Product; score: number }[] = [];
+
+      for (const p of filtered) {
+        const nameLower = p.name.toLowerCase();
+        const descLower = (p.description || '').toLowerCase();
+        const brandLower = (p.brand?.name || '').toLowerCase();
+        const catLower = (p.category?.name || '').toLowerCase();
+        const skuLower = (p.sku || '').toLowerCase();
+        const varColors = (p.variants || []).map((v) => v.color || '').join(' ').toLowerCase();
+        const varStorages = (p.variants || []).map((v) => v.storage || '').join(' ').toLowerCase();
+        const varSizes = (p.variants || []).map((v) => v.size || '').join(' ').toLowerCase();
+        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
+
+        const searchableText = `${nameLower} ${descLower} ${brandLower} ${catLower} ${skuLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+
+        if (tokens.every((token) => searchableText.includes(token))) {
+          let score = 0;
+          if (nameLower === q) score += 200;
+          else if (nameLower.startsWith(q)) score += 150;
+          else if (nameLower.includes(q)) score += 100;
+
+          if (brandLower === q) score += 120;
+          else if (brandLower.includes(q)) score += 80;
+
+          if (catLower === q) score += 70;
+          else if (catLower.includes(q)) score += 40;
+
+          for (const token of tokens) {
+            if (nameLower.includes(token)) score += 40;
+            if (brandLower.includes(token)) score += 35;
+            if (catLower.includes(token)) score += 25;
+            if (skuLower.includes(token)) score += 30;
+            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 20;
+            if (specStr.includes(token)) score += 15;
+            if (descLower.includes(token)) score += 5;
+          }
+          scored.push({ product: p, score });
+        }
+      }
+
+      if (!filters.sort || filters.sort === 'featured') {
+        scored.sort((a, b) => b.score - a.score);
+      }
+      filtered = scored.map((s) => s.product);
     }
 
     // Price range
@@ -203,15 +244,35 @@ export const catalogService = {
   getSuggestions: (query: string) => {
     const q = query.toLowerCase().trim();
     if (!q) return [];
-    return allProducts
-      .filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand?.name.toLowerCase().includes(q) ||
-          p.category?.name.toLowerCase().includes(q)
-      )
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    const scored: { product: Product; score: number }[] = [];
+    for (const p of allProducts) {
+      const nameLower = p.name.toLowerCase();
+      const brandLower = (p.brand?.name || '').toLowerCase();
+      const catLower = (p.category?.name || '').toLowerCase();
+      const skuLower = (p.sku || '').toLowerCase();
+      const searchableText = `${nameLower} ${brandLower} ${catLower} ${skuLower}`;
+
+      if (tokens.every((token) => searchableText.includes(token))) {
+        let score = 0;
+        if (nameLower.startsWith(q)) score += 100;
+        else if (nameLower.includes(q)) score += 60;
+        if (brandLower.startsWith(q)) score += 80;
+        else if (brandLower.includes(q)) score += 40;
+        for (const token of tokens) {
+          if (nameLower.includes(token)) score += 20;
+          if (brandLower.includes(token)) score += 15;
+          if (catLower.includes(token)) score += 10;
+        }
+        scored.push({ product: p, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored
       .slice(0, 8)
-      .map((p) => ({
+      .map(({ product: p }) => ({
         id: p.id,
         name: p.name,
         price: p.discountPrice || p.price,

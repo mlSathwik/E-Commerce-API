@@ -63,6 +63,11 @@ let memoryStore: MemoryStore = { ...initialSeedData };
 
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('localhost')) {
+      isPostgresAvailable = false;
+      logger.info('Operating in resilient Memory Store mode with full seed data.');
+      return false;
+    }
     await prisma.$queryRaw`SELECT 1`;
     isPostgresAvailable = true;
     logger.info('Connected to PostgreSQL database via Prisma');

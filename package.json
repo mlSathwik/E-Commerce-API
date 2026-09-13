@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "description": "ShopSphere - Modern Full-Stack E-Commerce Platform",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "lint": "npm --prefix frontend run build && npm --prefix backend run build",
+    "start": "npm --prefix backend start",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
-    "build": "cd backend && npm install && npm run build",
-    "start": "cd backend && npm start",
     "test:backend": "npm --prefix backend test",
     "test:frontend": "npm --prefix frontend test",
     "test": "npm --prefix backend test"

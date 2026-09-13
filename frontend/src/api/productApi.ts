@@ -13,18 +13,14 @@ export const productApi = {
       });
 
       const res = await apiClient.get<ApiResponse<Product[]>>(`/products?${params.toString()}`);
-      // Check if API returned full modern catalog (not legacy 14 products)
       if (res.data?.success && Array.isArray(res.data.data)) {
-        // If meta total or data length indicates full catalog, use it
-        if ((res.data.meta?.total && res.data.meta.total > 20) || res.data.data.length > 15) {
-          return res.data;
-        }
+        return res.data;
       }
     } catch (err) {
-      // Fallback
+      // Fallback to local catalog service
     }
 
-    // Return rich 181-product catalog
+    // Return rich resilient catalog
     const result = catalogService.getProducts(filters);
     return {
       success: true,

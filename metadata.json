@@ -1,0 +1,8 @@
+{
+  "name": "ShopSphere",
+  "description": "Modern full-stack e-commerce platform with rich product catalog, categories, cart, wishlist, order tracking, and admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

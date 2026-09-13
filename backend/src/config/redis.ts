@@ -1,45 +1,34 @@
-import Redis from 'ioredis';
-import { env } from './env.js';
+// MOCKED — in-memory store for AI Studio container environment
+const store = new Map<string, string>();
 
-let redisClient: Redis | null = null;
-let isRedisAvailable = false;
-
-try {
-  redisClient = new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: 1,
-    retryStrategy(times) {
-      if (times > 3) {
-        return null; // Stop retrying after 3 attempts
-      }
-      return Math.min(times * 100, 1000);
-    },
-    enableOfflineQueue: false,
-    connectTimeout: 2000,
-    lazyConnect: true,
-  });
-
-  redisClient.on('connect', () => {
-    isRedisAvailable = true;
-    console.log('✅ Connected to Redis cache service');
-  });
-
-  redisClient.on('error', (err) => {
-    isRedisAvailable = false;
-    // Suppress repeated connection logs if redis server is offline
-    if (process.env.NODE_ENV !== 'production') {
-      // Quiet failover
+let redisClient: any = {
+  get: async (key: string): Promise<string | null> => {
+    return store.get(key) ?? null;
+  },
+  set: async (key: string, value: string): Promise<string> => {
+    store.set(key, value);
+    return 'OK';
+  },
+  setex: async (key: string, seconds: number, value: string): Promise<string> => {
+    store.set(key, value);
+    return 'OK';
+  },
+  del: async (...keys: string[]): Promise<number> => {
+    let count = 0;
+    for (const key of keys) {
+      if (store.delete(key)) count++;
     }
-  });
+    return count;
+  },
+  keys: async (pattern: string): Promise<string[]> => {
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    return Array.from(store.keys()).filter((k) => regex.test(k));
+  },
+  connect: async () => {},
+  on: () => redisClient,
+};
 
-  // Attempt initial connect asynchronously
-  redisClient.connect().catch(() => {
-    isRedisAvailable = false;
-    console.log('ℹ️ Redis is offline or unavailable. Running in Direct Database mode.');
-  });
-} catch (error) {
-  isRedisAvailable = false;
-  console.log('ℹ️ Redis initialization skipped. Running in Direct Database mode.');
-}
+const isRedisAvailable = true;
 
 export { redisClient, isRedisAvailable };
 export const getRedisStatus = () => isRedisAvailable;

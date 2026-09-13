@@ -44,11 +44,12 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Images Gallery */}
         <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800 h-64 sm:h-72">
+          <div className="overflow-hidden rounded-2xl bg-gray-50 dark:bg-gray-800 h-64 sm:h-72 flex items-center justify-center">
             <img
               src={images[selectedImage]}
               alt={product.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain p-2"
+              referrerPolicy="no-referrer"
             />
           </div>
           {images.length > 1 && (
@@ -63,7 +64,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
                       : 'border-transparent opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  <img src={img} alt="" className="h-full w-full object-contain p-1" referrerPolicy="no-referrer" />
                 </button>
               ))}
             </div>
