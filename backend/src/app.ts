@@ -72,10 +72,12 @@ export const createApp = (): Express => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Static uploads directory
+  // Static uploads and public images directory
   const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
   const uploadsPath = path.resolve(rootDir, 'backend', 'uploads');
+  const imagesPath = path.resolve(rootDir, 'frontend', 'public', 'images');
   app.use('/uploads', express.static(uploadsPath));
+  app.use('/images', express.static(imagesPath));
 
   // Swagger API Documentation UI
   app.use('/api/docs', ...(swaggerUi.serve as any), swaggerUi.setup(swaggerSpec) as any);

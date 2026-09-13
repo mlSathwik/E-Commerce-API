@@ -14,7 +14,7 @@ async function setupFrontend(app: express.Express) {
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
-      if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/uploads')) {
+      if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/uploads') || req.originalUrl.startsWith('/images')) {
         return res.status(404).json({ success: false, message: 'Not found' });
       }
       res.sendFile(path.resolve(distPath, 'index.html'));
@@ -36,7 +36,7 @@ async function setupFrontend(app: express.Express) {
     });
     app.use(vite.middlewares);
     app.use('*', async (req: Request, res: Response, next: NextFunction) => {
-      if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/uploads')) {
+      if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/uploads') || req.originalUrl.startsWith('/images')) {
         return next();
       }
       try {
