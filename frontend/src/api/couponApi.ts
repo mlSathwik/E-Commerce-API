@@ -4,8 +4,8 @@ import { ApiResponse, Coupon } from '../types/index.js';
 const FALLBACK_COUPONS = [
   { code: 'WELCOME10', discountType: 'PERCENTAGE' as const, discountValue: 10, min: 500, maxDiscount: 1500 },
   { code: 'SAVE500', discountType: 'FIXED' as const, discountValue: 500, min: 2500, maxDiscount: null },
-  { code: 'SHOP20', discountType: 'PERCENTAGE' as const, discountValue: 20, min: 1000, maxDiscount: 3000 },
-  { code: 'FIRSTORDER', discountType: 'FIXED' as const, discountValue: 250, min: 999, maxDiscount: null },
+  { code: 'SHOP20', discountType: 'PERCENTAGE' as const, discountValue: 20, min: 1500, maxDiscount: 3000 },
+  { code: 'FIRSTORDER', discountType: 'PERCENTAGE' as const, discountValue: 25, min: 1000, maxDiscount: 2500 },
   { code: 'FLASH50', discountType: 'PERCENTAGE' as const, discountValue: 50, min: 2000, maxDiscount: 2000 },
 ];
 

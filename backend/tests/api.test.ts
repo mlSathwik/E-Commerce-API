@@ -81,6 +81,22 @@ describe('ShopSphere Backend API Integration Tests', () => {
     expect(res.body.data.discountAmount).toBe(100);
   });
 
+  it('POST /api/coupons/validate validates SHOP20 and FIRSTORDER', async () => {
+    const resShop20 = await request(app).post('/api/coupons/validate').send({
+      code: 'SHOP20',
+      orderAmount: 2000,
+    });
+    expect(resShop20.status).toBe(200);
+    expect(resShop20.body.data.discountAmount).toBe(400); // 20% of 2000
+
+    const resFirst = await request(app).post('/api/coupons/validate').send({
+      code: 'FIRSTORDER',
+      orderAmount: 2000,
+    });
+    expect(resFirst.status).toBe(200);
+    expect(resFirst.body.data.discountAmount).toBe(500); // 25% of 2000
+  });
+
   it('POST /api/cart/add adds item to cart', async () => {
     const res = await request(app)
       .post('/api/cart/add')

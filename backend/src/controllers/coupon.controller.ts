@@ -33,6 +33,21 @@ export const validateCoupon = async (req: Request, res: Response) => {
       );
     }
 
+    // Verify first-time purchaser eligibility for FIRSTORDER coupon
+    if (coupon.code === 'FIRSTORDER' && (req as any).user) {
+      const existingOrders = store.orders.filter(
+        (o) => o.userId === (req as any).user.id && o.orderStatus !== 'CANCELLED'
+      );
+      if (existingOrders.length > 0) {
+        return sendError(
+          res,
+          400,
+          'Coupon FIRSTORDER is valid only on your first purchase.',
+          'FIRST_ORDER_ONLY'
+        );
+      }
+    }
+
     let discountAmount = 0;
     if (coupon.discountType === 'PERCENTAGE') {
       discountAmount = (orderAmount * coupon.discountValue) / 100;
