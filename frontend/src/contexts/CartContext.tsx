@@ -19,13 +19,13 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
 
   const refreshCart = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       setCart(null);
       return;
     }
@@ -42,7 +42,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshCart();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   const addToCart = async (productId: string, quantity: number = 1, variantId?: string | null) => {
     if (!isAuthenticated) {

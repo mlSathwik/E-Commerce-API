@@ -16,12 +16,12 @@ interface WishlistContextType {
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [wishlist, setWishlist] = useState<Wishlist | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   const refreshWishlist = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       setWishlist(null);
       return;
     }
@@ -38,7 +38,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     refreshWishlist();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   const isInWishlist = (productId: string) => {
     if (!wishlist) return false;

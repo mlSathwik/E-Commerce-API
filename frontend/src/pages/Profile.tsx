@@ -41,21 +41,75 @@ export const Profile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Addresses State
-  const [addresses, setAddresses] = useState<Address[]>([
-    {
-      id: 'addr-1',
-      fullName: user?.name || 'Customer',
-      phone: user?.phone || '+91 9876543210',
-      street: '42 Tech Park Avenue, Cyber City',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      postalCode: '560100',
-      country: 'India',
-      addressType: 'HOME',
-      isDefault: true,
-    },
-  ]);
+  // Addresses State (Scoped strictly per user)
+  const [addresses, setAddresses] = useState<Address[]>(() => {
+    if (!user) return [];
+    const saved = localStorage.getItem(`shopsphere_addresses_${user.id}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    if (user.email === 'customer@shopsphere.com') {
+      return [
+        {
+          id: 'addr-1',
+          fullName: 'Alex Johnson',
+          phone: '+91 9876543211',
+          street: '42 Tech Park Avenue, Cyber City',
+          city: 'Bengaluru',
+          state: 'Karnataka',
+          postalCode: '560100',
+          country: 'India',
+          addressType: 'HOME',
+          isDefault: true,
+        },
+      ];
+    }
+    return [];
+  });
+
+  const saveUserAddresses = (newAddrs: Address[]) => {
+    setAddresses(newAddrs);
+    if (user?.id) {
+      localStorage.setItem(`shopsphere_addresses_${user.id}`, JSON.stringify(newAddrs));
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setPhone(user.phone || '');
+      setAvatar(user.avatar || '');
+      const saved = localStorage.getItem(`shopsphere_addresses_${user.id}`);
+      if (saved) {
+        try {
+          setAddresses(JSON.parse(saved));
+          return;
+        } catch {}
+      }
+      if (user.email === 'customer@shopsphere.com') {
+        setAddresses([
+          {
+            id: 'addr-1',
+            fullName: 'Alex Johnson',
+            phone: '+91 9876543211',
+            street: '42 Tech Park Avenue, Cyber City',
+            city: 'Bengaluru',
+            state: 'Karnataka',
+            postalCode: '560100',
+            country: 'India',
+            addressType: 'HOME',
+            isDefault: true,
+          },
+        ]);
+      } else {
+        setAddresses([]);
+      }
+    } else {
+      setAddresses([]);
+    }
+  }, [user?.id]);
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [newAddr, setNewAddr] = useState({
     fullName: user?.name || '',
@@ -130,7 +184,7 @@ export const Profile: React.FC = () => {
       ...newAddr,
       isDefault: addresses.length === 0,
     };
-    setAddresses([...addresses, added]);
+    saveUserAddresses([...addresses, added]);
     setShowAddAddress(false);
     setNewAddr({
       fullName: user?.name || '',
@@ -145,11 +199,11 @@ export const Profile: React.FC = () => {
   };
 
   const handleDeleteAddress = (id: string) => {
-    setAddresses(addresses.filter((a) => a.id !== id));
+    saveUserAddresses(addresses.filter((a) => a.id !== id));
   };
 
   const handleSetDefaultAddress = (id: string) => {
-    setAddresses(
+    saveUserAddresses(
       addresses.map((a) => ({
         ...a,
         isDefault: a.id === id,

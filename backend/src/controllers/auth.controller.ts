@@ -166,11 +166,12 @@ export const adminLogin = async (req: Request, res: Response) => {
 
 export const adminRegister = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, confirmPassword, adminInviteCode, phone } = req.body;
+    const { name, email, password, confirmPassword, adminInviteCode, adminCode, phone } = req.body;
     const store = getMemoryStore();
 
+    const inviteCode = adminInviteCode || adminCode;
     const validInviteCode = process.env.ADMIN_INVITE_CODE || 'SHOPSPHERE_ADMIN_2026';
-    if (!adminInviteCode || adminInviteCode !== validInviteCode) {
+    if (!inviteCode || inviteCode !== validInviteCode) {
       return sendError(
         res,
         403,

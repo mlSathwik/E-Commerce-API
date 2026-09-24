@@ -34,16 +34,71 @@ export const Checkout: React.FC = () => {
   const [error, setError] = useState('');
 
   // Step 1: Address
-  const [shippingAddress, setShippingAddress] = useState({
-    fullName: user?.name || 'Alex Johnson',
-    phone: user?.phone || '+91 9876543211',
-    street: '42 Tech Park Avenue, Cyber City',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    postalCode: '560100',
-    country: 'India',
-    addressType: 'HOME' as 'HOME' | 'WORK' | 'OTHER',
+  const [shippingAddress, setShippingAddress] = useState(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`shopsphere_addresses_${user.id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const defaultAddr = parsed.find((a: any) => a.isDefault) || parsed[0];
+          if (defaultAddr) {
+            return {
+              fullName: defaultAddr.fullName || user.name || '',
+              phone: defaultAddr.phone || user.phone || '',
+              street: defaultAddr.street || '',
+              city: defaultAddr.city || '',
+              state: defaultAddr.state || '',
+              postalCode: defaultAddr.postalCode || '',
+              country: defaultAddr.country || 'India',
+              addressType: (defaultAddr.addressType as 'HOME' | 'WORK' | 'OTHER') || 'HOME',
+            };
+          }
+        } catch {}
+      }
+    }
+    return {
+      fullName: user?.name || '',
+      phone: user?.phone || '',
+      street: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'India',
+      addressType: 'HOME' as 'HOME' | 'WORK' | 'OTHER',
+    };
   });
+
+  useEffect(() => {
+    if (user) {
+      setShippingAddress((prev) => {
+        if (prev.street && prev.city) return prev;
+        const saved = localStorage.getItem(`shopsphere_addresses_${user.id}`);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const defaultAddr = parsed.find((a: any) => a.isDefault) || parsed[0];
+            if (defaultAddr) {
+              return {
+                fullName: defaultAddr.fullName || user.name || '',
+                phone: defaultAddr.phone || user.phone || '',
+                street: defaultAddr.street || '',
+                city: defaultAddr.city || '',
+                state: defaultAddr.state || '',
+                postalCode: defaultAddr.postalCode || '',
+                country: defaultAddr.country || 'India',
+                addressType: (defaultAddr.addressType as 'HOME' | 'WORK' | 'OTHER') || 'HOME',
+              };
+            }
+          } catch {}
+        }
+        return {
+          ...prev,
+          fullName: prev.fullName || user.name || '',
+          phone: prev.phone || user.phone || '',
+        };
+      });
+    }
+  }, [user]);
 
   // Step 2: Delivery Option
   const [deliveryMethod, setDeliveryMethod] = useState<'STANDARD' | 'EXPRESS'>('STANDARD');

@@ -20,6 +20,7 @@ export const AdminLogin: React.FC = () => {
     try {
       const res = await authApi.adminLogin({ email, password });
       if (res.success && res.data) {
+        localStorage.setItem('shopsphere_user', JSON.stringify(res.data.user));
         localStorage.setItem('shopsphere_access_token', res.data.accessToken);
         localStorage.setItem('shopsphere_refresh_token', res.data.refreshToken);
         window.location.href = '/admin';
