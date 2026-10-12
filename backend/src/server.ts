@@ -23,8 +23,23 @@ async function setupFrontend(app: express.Express) {
     return;
   }
 
+  // If in production (Render API service) or standalone mode without frontend bundle
+  if (env.NODE_ENV === 'production') {
+    app.get('/', (_req: Request, res: Response) => {
+      res.json({
+        name: 'ShopSphere REST API',
+        status: 'ONLINE',
+        documentation: '/api/docs',
+        health: '/api/health',
+      });
+    });
+    return;
+  }
+
+  // In development, conditionally load Vite middleware without static build-time dependency
   try {
-    const { createServer: createViteServer } = await import('vite');
+    const viteModule = 'vite';
+    const { createServer: createViteServer } = await (Function('m', 'return import(m)')(viteModule) as Promise<any>);
     const vite = await createViteServer({
       configFile: path.resolve(frontendDir, 'vite.config.ts'),
       root: frontendDir,
@@ -54,7 +69,7 @@ async function setupFrontend(app: express.Express) {
     });
     logger.info('Mounted Vite dev server middleware for frontend');
   } catch (viteError) {
-    logger.warn('Vite dev middleware could not be loaded:', viteError);
+    logger.info('Vite dev middleware not loaded (operating as standalone API)');
   }
 }
 
