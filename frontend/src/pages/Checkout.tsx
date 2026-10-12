@@ -15,6 +15,9 @@ import {
   Home as HomeIcon,
   Briefcase,
   Building2,
+  X,
+  Smartphone,
+  Lock,
 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext.js';
 import { useAuth } from '../contexts/AuthContext.js';
@@ -32,6 +35,17 @@ export const Checkout: React.FC = () => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Razorpay Test Sandbox Modal State
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayModalOrder, setRazorpayModalOrder] = useState<any>(null);
+  const [sandboxPaymentTab, setSandboxPaymentTab] = useState<'UPI' | 'CARD' | 'NETBANKING'>('UPI');
+  const [testUpiId, setTestUpiId] = useState('success@razorpay');
+  const [testCardNumber, setTestCardNumber] = useState('4012 0000 0000 0002');
+  const [testCardExpiry, setTestCardExpiry] = useState('12/28');
+  const [testCardCvv, setTestCardCvv] = useState('123');
+  const [testBank, setTestBank] = useState('HDFC Bank');
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   // Step 1: Address
   const [shippingAddress, setShippingAddress] = useState(() => {
@@ -56,13 +70,14 @@ export const Checkout: React.FC = () => {
         } catch {}
       }
     }
+    const isDemoCustomer = user?.email === 'customer@shopsphere.com';
     return {
-      fullName: user?.name || '',
-      phone: user?.phone || '',
-      street: '',
-      city: '',
-      state: '',
-      postalCode: '',
+      fullName: user?.name || (isDemoCustomer ? 'Alex Johnson' : ''),
+      phone: user?.phone || (isDemoCustomer ? '+91 9876543211' : ''),
+      street: isDemoCustomer ? '42 Tech Park Avenue, Cyber City' : '',
+      city: isDemoCustomer ? 'Bengaluru' : '',
+      state: isDemoCustomer ? 'Karnataka' : '',
+      postalCode: isDemoCustomer ? '560100' : '',
       country: 'India',
       addressType: 'HOME' as 'HOME' | 'WORK' | 'OTHER',
     };
@@ -168,6 +183,65 @@ export const Checkout: React.FC = () => {
     }
   };
 
+  const validateAddress = () => {
+    if (!shippingAddress.fullName.trim()) return 'Please provide your full name for delivery.';
+    if (!shippingAddress.phone.trim() || shippingAddress.phone.length < 8) return 'Please provide a valid contact phone number (min 8 digits).';
+    if (!shippingAddress.street.trim() || shippingAddress.street.length < 3) return 'Please provide a valid street address / building name (min 3 characters).';
+    if (!shippingAddress.city.trim() || shippingAddress.city.length < 2) return 'Please enter your city.';
+    if (!shippingAddress.state.trim() || shippingAddress.state.length < 2) return 'Please enter your state.';
+    if (!shippingAddress.postalCode.trim() || shippingAddress.postalCode.length < 4) return 'Please enter a valid postal / PIN code (min 4 digits).';
+    return null;
+  };
+
+  const handleContinueToDelivery = () => {
+    const err = validateAddress();
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError('');
+    // Cache address for user
+    if (user?.id) {
+      try {
+        const saved = localStorage.getItem(`shopsphere_addresses_${user.id}`);
+        const parsed = saved ? JSON.parse(saved) : [];
+        const exists = parsed.some((a: any) => a.street === shippingAddress.street && a.postalCode === shippingAddress.postalCode);
+        if (!exists) {
+          parsed.unshift({ ...shippingAddress, id: `addr-${Date.now()}`, isDefault: parsed.length === 0 });
+          localStorage.setItem(`shopsphere_addresses_${user.id}`, JSON.stringify(parsed));
+        }
+      } catch {}
+    }
+    setStep(2);
+  };
+
+  const handleCompleteSandboxPayment = async () => {
+    if (!razorpayModalOrder) return;
+    setVerifyingPayment(true);
+    try {
+      const { order, razorpayOrder } = razorpayModalOrder;
+      const testPaymentId = `pay_test_${Date.now()}`;
+      await paymentApi.verifyPayment({
+        orderId: order.id,
+        razorpayOrderId: razorpayOrder?.id || `order_${Date.now()}`,
+        razorpayPaymentId: testPaymentId,
+        razorpaySignature: 'sandbox_test_sig',
+      });
+      setShowRazorpayModal(false);
+      await refreshCart();
+      navigate(`/order-success/${order.id}`);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Payment verification failed');
+    } finally {
+      setVerifyingPayment(false);
+    }
+  };
+
+  const handleSimulatePaymentFailure = () => {
+    setShowRazorpayModal(false);
+    setError('Payment Cancelled / Failed in Sandbox. You can choose another payment option or retry.');
+  };
+
   const handlePlaceOrder = async () => {
     setLoading(true);
     setError('');
@@ -202,6 +276,14 @@ export const Checkout: React.FC = () => {
       // 3. Razorpay Online Payment Flow
       if (paymentMethod === 'RAZORPAY') {
         const rzpKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_shopsphere_mock_id';
+        const isMockMode = !rzpKey || rzpKey.includes('mock') || rzpKey.includes('test_shopsphere');
+
+        if (isMockMode) {
+          // Open interactive Razorpay Test Sandbox modal
+          setRazorpayModalOrder({ order, razorpayOrder });
+          setShowRazorpayModal(true);
+          return;
+        }
 
         const razorpayOptions = {
           key: rzpKey,
@@ -242,15 +324,8 @@ export const Checkout: React.FC = () => {
           });
           rzp.open();
         } else {
-          // In test / offline simulation environments
-          await paymentApi.verifyPayment({
-            orderId: order.id,
-            razorpayOrderId: razorpayOrder?.id || `order_${Date.now()}`,
-            razorpayPaymentId: `pay_${Date.now()}`,
-            razorpaySignature: 'simulated_sig',
-          });
-          await refreshCart();
-          navigate(`/order-success/${order.id}`);
+          setRazorpayModalOrder({ order, razorpayOrder });
+          setShowRazorpayModal(true);
         }
       }
     } catch (err: any) {
@@ -422,7 +497,7 @@ export const Checkout: React.FC = () => {
               </div>
 
               <div className="pt-4 flex justify-end">
-                <Button onClick={() => setStep(2)} size="md" className="gap-2">
+                <Button onClick={handleContinueToDelivery} size="md" className="gap-2">
                   Continue to Delivery <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -801,6 +876,206 @@ export const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Razorpay Interactive Sandbox / Test Payment Modal */}
+      {showRazorpayModal && razorpayModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+            {/* Razorpay Brand Header */}
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 p-5 text-white">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
+                    <CreditCard className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black tracking-wide">Razorpay Checkout</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/20 px-1.5 py-0.5 rounded-full">
+                      Sandbox / Test Mode
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRazorpayModal(false)}
+                  className="rounded-full p-1 text-white/80 hover:bg-white/10 hover:text-white transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-2 border-t border-white/10">
+                <div>
+                  <span className="text-[11px] text-indigo-100">Order #{razorpayModalOrder.order?.orderNumber}</span>
+                  <p className="text-[11px] text-indigo-200">{razorpayModalOrder.order?.shippingAddress?.fullName}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-indigo-200">Total Amount</span>
+                  <p className="text-xl font-black">{formatPrice(razorpayModalOrder.order?.totalAmount)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sandbox Tabs */}
+            <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40 p-1">
+              {[
+                { tab: 'UPI', label: 'UPI / QR', icon: Smartphone },
+                { tab: 'CARD', label: 'Test Cards', icon: CreditCard },
+                { tab: 'NETBANKING', label: 'NetBanking', icon: Building2 },
+              ].map(({ tab, label, icon: Icon }) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSandboxPaymentTab(tab as any)}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition ${
+                    sandboxPaymentTab === tab
+                      ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Contents */}
+            <div className="p-5 space-y-4">
+              {sandboxPaymentTab === 'UPI' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Test UPI Virtual Payment Address (VPA)
+                    </label>
+                    <input
+                      type="text"
+                      value={testUpiId}
+                      onChange={(e) => setTestUpiId(e.target.value)}
+                      placeholder="success@razorpay"
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="rounded-xl bg-indigo-50/60 p-3 text-[11px] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    💡 Simulated test VPA: Instant verification without real UPI app required.
+                  </div>
+                </div>
+              )}
+
+              {sandboxPaymentTab === 'CARD' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Test Card Number
+                    </label>
+                    <input
+                      type="text"
+                      value={testCardNumber}
+                      onChange={(e) => setTestCardNumber(e.target.value)}
+                      placeholder="4012 0000 0000 0002"
+                      className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-mono text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        Expiry
+                      </label>
+                      <input
+                        type="text"
+                        value={testCardExpiry}
+                        onChange={(e) => setTestCardExpiry(e.target.value)}
+                        placeholder="12/28"
+                        className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        CVV
+                      </label>
+                      <input
+                        type="text"
+                        value={testCardCvv}
+                        onChange={(e) => setTestCardCvv(e.target.value)}
+                        placeholder="123"
+                        className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-indigo-50/60 p-3 text-[11px] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    💡 Standard Razorpay test Visa card prefilled for instant checkout testing.
+                  </div>
+                </div>
+              )}
+
+              {sandboxPaymentTab === 'NETBANKING' && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Select Test Bank
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['HDFC Bank', 'State Bank of India', 'ICICI Bank', 'Axis Bank'].map((bank) => (
+                      <button
+                        key={bank}
+                        type="button"
+                        onClick={() => setTestBank(bank)}
+                        className={`rounded-xl border p-2.5 text-xs font-bold text-center transition ${
+                          testBank === bank
+                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 ring-2 ring-indigo-500/20'
+                            : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400'
+                        }`}
+                      >
+                        {bank}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Security info */}
+              <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                <span className="flex items-center gap-1">
+                  <Lock className="h-3 w-3 text-emerald-500" /> End-to-end 256-bit encrypted
+                </span>
+                <span>Powered by Razorpay</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-2">
+                <Button
+                  onClick={handleCompleteSandboxPayment}
+                  loading={verifyingPayment}
+                  size="md"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs gap-2 py-3"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Pay {formatPrice(razorpayModalOrder.order?.totalAmount)} (Test Success)
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSimulatePaymentFailure}
+                    disabled={verifyingPayment}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 text-[11px] dark:border-rose-900 dark:hover:bg-rose-950/40"
+                  >
+                    Simulate Failure
+                  </Button>
+                  <Button
+                    onClick={() => setShowRazorpayModal(false)}
+                    disabled={verifyingPayment}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 text-[11px]"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
