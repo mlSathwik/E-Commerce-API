@@ -71,11 +71,12 @@ async function bootstrap() {
     await setupFrontend(app);
 
     // 4. Start HTTP server
-    const server = app.listen(3000, '0.0.0.0', () => {
+    const port = env.PORT;
+    const server = app.listen(port, '0.0.0.0', () => {
       logger.info('====================================================');
-      logger.info('🚀 ShopSphere REST API running on http://0.0.0.0:3000');
-      logger.info('📡 Health check: http://localhost:3000/api/health');
-      logger.info('📚 Swagger Documentation: http://localhost:3000/api/docs');
+      logger.info(`🚀 ShopSphere REST API running on http://0.0.0.0:${port}`);
+      logger.info(`📡 Health check: http://localhost:${port}/api/health`);
+      logger.info(`📚 Swagger Documentation: http://localhost:${port}/api/docs`);
       logger.info(`🌐 Client allowed origin: ${env.CLIENT_URL}`);
       logger.info('====================================================');
     });
