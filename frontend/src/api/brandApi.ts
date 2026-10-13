@@ -6,7 +6,7 @@ export const brandApi = {
   getBrands: async () => {
     try {
       const res = await apiClient.get<ApiResponse<Brand[]>>('/brands');
-      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length >= 20) {
+      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
         return res.data;
       }
     } catch (err) {

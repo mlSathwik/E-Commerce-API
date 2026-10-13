@@ -24,7 +24,8 @@ import { useWishlist } from '../../contexts/WishlistContext.js';
 import { useTheme } from '../../contexts/ThemeContext.js';
 import { useNotifications } from '../../contexts/NotificationContext.js';
 import { productApi } from '../../api/productApi.js';
-import { Product } from '../../types/index.js';
+import { categoryApi } from '../../api/categoryApi.js';
+import { Product, Category } from '../../types/index.js';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -41,9 +42,23 @@ export const Navbar: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const [navCategories, setNavCategories] = useState<Category[]>([]);
+
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Fetch categories for navigation dropdown
+  useEffect(() => {
+    categoryApi
+      .getCategories()
+      .then((res) => {
+        if (res?.data && Array.isArray(res.data)) {
+          setNavCategories(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Autocomplete search debounce
   useEffect(() => {
@@ -122,22 +137,35 @@ export const Navbar: React.FC = () => {
               Categories <ChevronDown className="h-3.5 w-3.5" />
             </button>
             <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50">
-              <div className="w-56 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-                <Link to="/shop?category=smartphones" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Smartphones
-                </Link>
-                <Link to="/shop?category=laptops" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Laptops & Computers
-                </Link>
-                <Link to="/shop?category=audio" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Audio & Headphones
-                </Link>
-                <Link to="/shop?category=smartwatches" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Smartwatches & Wearables
-                </Link>
-                <Link to="/shop?category=tablets" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Tablets & iPads
-                </Link>
+              <div className="w-56 max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                {navCategories.length > 0 ? (
+                  navCategories
+                    .filter((cat) => cat.productCount === undefined || cat.productCount >= 1)
+                    .map((cat) => (
+                      <Link
+                        key={cat.id}
+                        to={`/shop?category=${cat.slug}`}
+                        className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                      >
+                        <span className="truncate">{cat.name}</span>
+                        {cat.productCount !== undefined && (
+                          <span className="text-[10px] text-gray-400">({cat.productCount})</span>
+                        )}
+                      </Link>
+                    ))
+                ) : (
+                  <>
+                    <Link to="/shop?category=smartphones" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                      Smartphones
+                    </Link>
+                    <Link to="/shop?category=laptops" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                      Laptops & Computers
+                    </Link>
+                    <Link to="/shop?category=audio" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                      Audio & Headphones
+                    </Link>
+                  </>
+                )}
                 <Link to="/shop" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40 border-t border-gray-100 dark:border-gray-800 mt-1">
                   View All Categories →
                 </Link>

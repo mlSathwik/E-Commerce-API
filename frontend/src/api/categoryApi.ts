@@ -6,12 +6,8 @@ export const categoryApi = {
   getCategories: async () => {
     try {
       const res = await apiClient.get<ApiResponse<Category[]>>('/categories');
-      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length >= 11) {
-        const scrubbed = ['gaming-vr', 'home-kitchen', 'sports-fitness', 'womens-fashion', 'fitness'];
-        const hasScrubbed = res.data.data.some((c) => scrubbed.includes(c.slug.toLowerCase()));
-        if (!hasScrubbed) {
-          return res.data;
-        }
+      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+        return res.data;
       }
     } catch (err) {
       // Ignore and fallback

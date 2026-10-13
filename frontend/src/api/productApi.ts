@@ -95,7 +95,7 @@ export const productApi = {
         sizes: string[];
         priceRange: { min: number; max: number };
       }>>(url);
-      if (res.data?.success && res.data.data && res.data.data.categories.length >= 11) {
+      if (res.data?.success && res.data.data && Array.isArray(res.data.data.categories) && res.data.data.categories.length > 0) {
         return res.data;
       }
     } catch (err) {}

@@ -212,27 +212,29 @@ export const Home: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              to={`/shop?category=${cat.slug}`}
-              className="group relative flex flex-col items-center rounded-2xl border border-gray-200/80 bg-white p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500 hover:shadow-card dark:border-gray-800/80 dark:bg-gray-900"
-            >
-              <div className="h-20 w-20 overflow-hidden rounded-2xl mb-3 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <img
-                  src={cat.image || 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=200&q=80'}
-                  alt={cat.name}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
-                />
-              </div>
-              <h3 className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                {cat.name}
-              </h3>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                {cat.productCount ?? 12}+ Products
-              </p>
-            </Link>
-          ))}
+          {categories
+            .filter((cat) => cat.productCount === undefined || cat.productCount >= 1)
+            .map((cat) => (
+              <Link
+                key={cat.id}
+                to={`/shop?category=${cat.slug}`}
+                className="group relative flex flex-col items-center rounded-2xl border border-gray-200/80 bg-white p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500 hover:shadow-card dark:border-gray-800/80 dark:bg-gray-900"
+              >
+                <div className="h-20 w-20 overflow-hidden rounded-2xl mb-3 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <img
+                    src={cat.image || 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=200&q=80'}
+                    alt={cat.name}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
+                  />
+                </div>
+                <h3 className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                  {cat.name}
+                </h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {cat.productCount === 1 ? '1 Product' : `${cat.productCount ?? 0}+ Products`}
+                </p>
+              </Link>
+            ))}
         </div>
       </section>
 

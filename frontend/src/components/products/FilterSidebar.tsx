@@ -48,7 +48,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             />
             <span>All Categories</span>
           </label>
-          {categories.map((cat) => (
+          {categories
+            .filter((cat) => cat.productCount === undefined || cat.productCount >= 1 || filters.category === cat.slug)
+            .map((cat) => (
             <label
               key={cat.id}
               className="flex items-center justify-between text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white cursor-pointer py-0.5"
