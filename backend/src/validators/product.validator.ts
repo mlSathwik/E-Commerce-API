@@ -44,6 +44,7 @@ export const productQuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(12),
     search: z.string().optional(),
+    q: z.string().optional(),
     category: z.string().optional(),
     brand: z.string().optional(),
     minPrice: z.coerce.number().optional(),

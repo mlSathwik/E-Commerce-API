@@ -153,10 +153,45 @@ export const Shop: React.FC = () => {
               ? `Showing ${startIdx}–${endIdx} of ${totalCount} products`
               : 'No products match your current filters'}
           </p>
+          {filters.search && (
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                Searching: "{filters.search}"
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, search: undefined, page: 1 }))}
+                  className="rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-800 p-0.5 text-indigo-500 hover:text-indigo-900 dark:hover:text-white"
+                  title="Remove search filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Sorting Dropdown & Mobile Filter Button */}
-        <div className="flex items-center gap-3">
+        {/* Search, Sorting Dropdown & Mobile Filter Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 sm:w-64 max-w-xs">
+            <input
+              type="text"
+              placeholder="Search products, SKU, brand..."
+              value={filters.search || ''}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value.trim() ? e.target.value : undefined, page: 1 }))}
+              className="w-full rounded-xl border border-gray-300 bg-white pl-9 pr-8 py-2 text-xs font-semibold text-gray-800 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+            />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+            {filters.search && (
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, search: undefined, page: 1 }))}
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => setIsMobileFilterOpen(true)}
             className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 lg:hidden"

@@ -95,46 +95,112 @@ export const catalogService = {
       }
     }
 
-    // Search query with multi-token weighted scoring
+    // Multi-field intelligent search across: name, brand, model, category, SKU, and description
     if (filters.search) {
       const q = filters.search.toLowerCase().trim();
-      const tokens = q.split(/\s+/).filter(Boolean);
+      const cleanSearch = q.replace(/[&,+\/\\()"[\]{}:;!?]/g, ' ').trim();
+      const rawTokens = cleanSearch.split(/\s+/).filter((t) => t.length > 0);
+      const tokens: string[] = [];
+      for (const t of rawTokens) {
+        tokens.push(t);
+        if (t.includes('-')) {
+          tokens.push(t.replace(/-/g, ''));
+          tokens.push(...t.split('-').filter((part) => part.length >= 2));
+        }
+      }
+      const uniqueTokens = Array.from(new Set(tokens.filter((t) => t.length > 0)));
       const scored: { product: Product; score: number }[] = [];
 
       for (const p of filtered) {
-        const nameLower = p.name.toLowerCase();
+        // 1. Name & slug
+        const nameLower = (p.name || '').toLowerCase();
+        const slugLower = (p.slug || '').toLowerCase();
+
+        // 2. Brand (name and slug)
+        const brandNameLower = (p.brand?.name || (typeof p.brand === 'string' ? p.brand : '') || '').toLowerCase();
+        const brandSlugLower = (p.brand?.slug || '').toLowerCase();
+
+        // 3. Category (name and slug)
+        const catNameLower = (p.category?.name || (typeof p.category === 'string' ? p.category : '') || '').toLowerCase();
+        const catSlugLower = (p.category?.slug || '').toLowerCase();
+
+        // 4. SKU & Variant SKUs
+        const mainSkuLower = (p.sku || '').toLowerCase();
+        const variantSkus = (p.variants || []).map((v) => (v.sku || '').toLowerCase()).join(' ');
+
+        // 5. Model: explicit model, specification model, chipset/processor
+        const specModel = (p.specifications?.Model || p.specifications?.model || '').toLowerCase();
+        const specChipset = (p.specifications?.Chipset || p.specifications?.Processor || '').toLowerCase();
+        const variantProcessors = (p.variants || []).map((v: any) => (v.processor || '').toLowerCase()).join(' ');
+        const explicitModel = (p.model || '').toLowerCase();
+        const modelCombined = `${explicitModel} ${specModel} ${specChipset} ${variantProcessors}`.trim();
+
+        // 6. Description & Specifications & Variant Attributes
         const descLower = (p.description || '').toLowerCase();
-        const brandLower = (p.brand?.name || '').toLowerCase();
-        const catLower = (p.category?.name || '').toLowerCase();
-        const skuLower = (p.sku || '').toLowerCase();
+        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
         const varColors = (p.variants || []).map((v) => v.color || '').join(' ').toLowerCase();
         const varStorages = (p.variants || []).map((v) => v.storage || '').join(' ').toLowerCase();
         const varSizes = (p.variants || []).map((v) => v.size || '').join(' ').toLowerCase();
-        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
 
-        const searchableText = `${nameLower} ${descLower} ${brandLower} ${catLower} ${skuLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+        const searchableText = `${nameLower} ${slugLower} ${brandNameLower} ${brandSlugLower} ${catNameLower} ${catSlugLower} ${modelCombined} ${mainSkuLower} ${variantSkus} ${descLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+        const normalizedSearchable = searchableText.replace(/[-_&,+\/\\()"[\]{}:;!?]/g, ' ');
 
-        if (tokens.every((token) => searchableText.includes(token))) {
+        // Matching conditions
+        const wholeMatch = searchableText.includes(q) ||
+                           normalizedSearchable.includes(cleanSearch) ||
+                           searchableText.includes(cleanSearch);
+
+        const allRawTokensMatch = rawTokens.length > 0 && rawTokens.every((token) => {
+          const normToken = token.replace(/[-_]/g, '');
+          return searchableText.includes(token) ||
+                 normalizedSearchable.includes(token) ||
+                 (normToken.length >= 3 && (searchableText.includes(normToken) || normalizedSearchable.includes(normToken)));
+        });
+
+        const categoryOrBrandMatch = rawTokens.some((tok) =>
+          tok.length >= 3 && (catNameLower === tok || catSlugLower === tok || brandNameLower === tok || brandSlugLower === tok)
+        );
+
+        const directFieldMatch = nameLower.includes(q) ||
+                                 brandNameLower.includes(q) ||
+                                 catNameLower.includes(q) ||
+                                 catSlugLower === q ||
+                                 brandSlugLower === q ||
+                                 (modelCombined.length > 0 && modelCombined.includes(q)) ||
+                                 mainSkuLower.includes(q) ||
+                                 variantSkus.includes(q);
+
+        if (wholeMatch || allRawTokensMatch || directFieldMatch || categoryOrBrandMatch) {
           let score = 0;
-          if (nameLower === q) score += 200;
-          else if (nameLower.startsWith(q)) score += 150;
-          else if (nameLower.includes(q)) score += 100;
 
-          if (brandLower === q) score += 120;
-          else if (brandLower.includes(q)) score += 80;
+          // Exact or prefix matches
+          if (nameLower === q) score += 300;
+          else if (nameLower.startsWith(q)) score += 200;
+          else if (nameLower.includes(q)) score += 120;
 
-          if (catLower === q) score += 70;
-          else if (catLower.includes(q)) score += 40;
+          if (brandNameLower === q || brandSlugLower === q) score += 200;
+          else if (brandNameLower.includes(q)) score += 100;
 
-          for (const token of tokens) {
+          if (catNameLower === q || catSlugLower === q) score += 180;
+          else if (catNameLower.includes(q)) score += 90;
+
+          if (mainSkuLower === q || variantSkus.split(' ').includes(q)) score += 250;
+          else if (mainSkuLower.includes(q) || variantSkus.includes(q)) score += 140;
+
+          if (modelCombined && (modelCombined.includes(q) || q.includes(modelCombined))) score += 160;
+          if (categoryOrBrandMatch) score += 150;
+
+          // Token-level scoring
+          for (const token of uniqueTokens) {
             if (nameLower.includes(token)) score += 40;
-            if (brandLower.includes(token)) score += 35;
-            if (catLower.includes(token)) score += 25;
-            if (skuLower.includes(token)) score += 30;
-            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 20;
-            if (specStr.includes(token)) score += 15;
-            if (descLower.includes(token)) score += 5;
+            if (brandNameLower.includes(token)) score += 35;
+            if (catNameLower.includes(token)) score += 30;
+            if (modelCombined.includes(token)) score += 30;
+            if (mainSkuLower.includes(token) || variantSkus.includes(token)) score += 35;
+            if (descLower.includes(token)) score += 10;
+            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 15;
           }
+
           scored.push({ product: p, score });
         }
       }

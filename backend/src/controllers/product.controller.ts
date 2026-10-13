@@ -34,52 +34,113 @@ export const getProducts = async (req: Request, res: Response) => {
     const store = getMemoryStore();
     let filtered = [...store.products];
 
-    // Multi-token intelligent search with weighted relevance scoring
+    // Multi-field intelligent search across: name, brand, model, category, SKU, and description
     if (search) {
-      const tokens = search.split(/\s+/).filter(Boolean);
+      const cleanSearch = search.replace(/[&,+\/\\()"[\]{}:;!?]/g, ' ').trim();
+      const rawTokens = cleanSearch.split(/\s+/).filter((t) => t.length > 0);
+      const tokens: string[] = [];
+      for (const t of rawTokens) {
+        tokens.push(t);
+        if (t.includes('-')) {
+          tokens.push(t.replace(/-/g, ''));
+          tokens.push(...t.split('-').filter((part) => part.length >= 2));
+        }
+      }
+      const uniqueTokens = Array.from(new Set(tokens.filter((t) => t.length > 0)));
       const scored: { product: any; score: number }[] = [];
 
       for (const p of filtered) {
         const cat = store.categories.find((c) => c.id === p.categoryId);
         const br = store.brands.find((b) => b.id === p.brandId);
         const pVariants = store.productVariants.filter((v) => v.productId === p.id);
+
+        // 1. Name & slug
+        const nameLower = (p.name || '').toLowerCase();
+        const slugLower = (p.slug || '').toLowerCase();
+
+        // 2. Brand (name and slug)
+        const brandNameLower = (br?.name || (typeof p.brand === 'string' ? p.brand : p.brand?.name) || '').toLowerCase();
+        const brandSlugLower = (br?.slug || p.brand?.slug || '').toLowerCase();
+
+        // 3. Category (name and slug)
+        const catNameLower = (cat?.name || (typeof p.category === 'string' ? p.category : p.category?.name) || '').toLowerCase();
+        const catSlugLower = (cat?.slug || p.category?.slug || '').toLowerCase();
+
+        // 4. SKU & Variant SKUs
+        const mainSkuLower = (p.sku || '').toLowerCase();
+        const variantSkus = pVariants.map((v) => (v.sku || '').toLowerCase()).join(' ');
+
+        // 5. Model: explicit model, specification model, chipset/processor, and variant processors
+        const specModel = (p.specifications?.Model || p.specifications?.model || '').toLowerCase();
+        const specChipset = (p.specifications?.Chipset || p.specifications?.Processor || '').toLowerCase();
+        const variantProcessors = pVariants.map((v) => (v.processor || '').toLowerCase()).join(' ');
+        const explicitModel = (p.model || '').toLowerCase();
+        const modelCombined = `${explicitModel} ${specModel} ${specChipset} ${variantProcessors}`.trim();
+
+        // 6. Description & Specifications & Variant Attributes
+        const descLower = (p.description || '').toLowerCase();
+        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
         const varColors = pVariants.map((v) => v.color || '').join(' ').toLowerCase();
         const varStorages = pVariants.map((v) => v.storage || '').join(' ').toLowerCase();
         const varSizes = pVariants.map((v) => v.size || '').join(' ').toLowerCase();
-        const specStr = p.specifications ? JSON.stringify(p.specifications).toLowerCase() : '';
 
-        const nameLower = p.name.toLowerCase();
-        const descLower = p.description.toLowerCase();
-        const skuLower = p.sku.toLowerCase();
-        const brandLower = (br?.name || '').toLowerCase();
-        const catLower = (cat?.name || '').toLowerCase();
+        const searchableText = `${nameLower} ${slugLower} ${brandNameLower} ${brandSlugLower} ${catNameLower} ${catSlugLower} ${modelCombined} ${mainSkuLower} ${variantSkus} ${descLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+        const normalizedSearchable = searchableText.replace(/[-_&,+\/\\()"[\]{}:;!?]/g, ' ');
 
-        const searchableText = `${nameLower} ${descLower} ${skuLower} ${catLower} ${brandLower} ${specStr} ${varColors} ${varStorages} ${varSizes}`;
+        // Matching conditions
+        const wholeMatch = searchableText.includes(search) ||
+                           normalizedSearchable.includes(cleanSearch) ||
+                           searchableText.includes(cleanSearch);
 
-        if (tokens.every((token) => searchableText.includes(token))) {
+        const allRawTokensMatch = rawTokens.length > 0 && rawTokens.every((token) => {
+          const normToken = token.replace(/[-_]/g, '');
+          return searchableText.includes(token) ||
+                 normalizedSearchable.includes(token) ||
+                 (normToken.length >= 3 && (searchableText.includes(normToken) || normalizedSearchable.includes(normToken)));
+        });
+
+        const categoryOrBrandMatch = rawTokens.some((tok) =>
+          tok.length >= 3 && (catNameLower === tok || catSlugLower === tok || brandNameLower === tok || brandSlugLower === tok)
+        );
+
+        const directFieldMatch = nameLower.includes(search) ||
+                                 brandNameLower.includes(search) ||
+                                 catNameLower.includes(search) ||
+                                 catSlugLower === search ||
+                                 brandSlugLower === search ||
+                                 (modelCombined.length > 0 && modelCombined.includes(search)) ||
+                                 mainSkuLower.includes(search) ||
+                                 variantSkus.includes(search);
+
+        if (wholeMatch || allRawTokensMatch || directFieldMatch || categoryOrBrandMatch) {
           let score = 0;
-          // Exact name match or starts with
-          if (nameLower === search) score += 200;
-          else if (nameLower.startsWith(search)) score += 150;
-          else if (nameLower.includes(search)) score += 100;
 
-          // Brand exact match or token match
-          if (brandLower === search) score += 120;
-          else if (brandLower.includes(search)) score += 80;
+          // Exact or prefix matches
+          if (nameLower === search) score += 300;
+          else if (nameLower.startsWith(search)) score += 200;
+          else if (nameLower.includes(search)) score += 120;
 
-          // Category match
-          if (catLower === search) score += 70;
-          else if (catLower.includes(search)) score += 40;
+          if (brandNameLower === search || brandSlugLower === search) score += 200;
+          else if (brandNameLower.includes(search)) score += 100;
+
+          if (catNameLower === search || catSlugLower === search) score += 180;
+          else if (catNameLower.includes(search)) score += 90;
+
+          if (mainSkuLower === search || variantSkus.split(' ').includes(search)) score += 250;
+          else if (mainSkuLower.includes(search) || variantSkus.includes(search)) score += 140;
+
+          if (modelCombined && (modelCombined.includes(search) || search.includes(modelCombined))) score += 160;
+          if (categoryOrBrandMatch) score += 150;
 
           // Token-level scoring
-          for (const token of tokens) {
+          for (const token of uniqueTokens) {
             if (nameLower.includes(token)) score += 40;
-            if (brandLower.includes(token)) score += 35;
-            if (catLower.includes(token)) score += 25;
-            if (skuLower.includes(token)) score += 30;
-            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 20;
-            if (specStr.includes(token)) score += 15;
-            if (descLower.includes(token)) score += 5;
+            if (brandNameLower.includes(token)) score += 35;
+            if (catNameLower.includes(token)) score += 30;
+            if (modelCombined.includes(token)) score += 30;
+            if (mainSkuLower.includes(token) || variantSkus.includes(token)) score += 35;
+            if (descLower.includes(token)) score += 10;
+            if (varColors.includes(token) || varStorages.includes(token) || varSizes.includes(token)) score += 15;
           }
 
           scored.push({ product: p, score });
@@ -248,15 +309,19 @@ export const getSearchSuggestions = async (req: Request, res: Response) => {
     }
 
     const store = getMemoryStore();
-    const tokens = q.split(/\s+/).filter(Boolean);
+    const cleanQ = q.replace(/[&,+\/\\()"[\]{}:;!?]/g, ' ').trim();
+    const tokens = cleanQ.split(/\s+/).filter(Boolean);
 
     // Matching products
     const matchedProducts = store.products
       .filter((p) => {
         const cat = store.categories.find((c) => c.id === p.categoryId);
         const br = store.brands.find((b) => b.id === p.brandId);
-        const searchable = `${p.name} ${br?.name || ''} ${cat?.name || ''} ${p.sku}`.toLowerCase();
-        return tokens.every((tok) => searchable.includes(tok));
+        const pVariants = store.productVariants.filter((v) => v.productId === p.id);
+        const variantSkus = pVariants.map((v) => (v.sku || '').toLowerCase()).join(' ');
+        const specModel = (p.specifications?.Model || p.specifications?.model || '').toLowerCase();
+        const searchable = `${p.name} ${br?.name || ''} ${cat?.name || ''} ${p.sku} ${variantSkus} ${p.model || ''} ${specModel}`.toLowerCase();
+        return searchable.includes(q) || (tokens.length > 0 && tokens.every((tok) => searchable.includes(tok)));
       })
       .slice(0, 6)
       .map((p) => {
